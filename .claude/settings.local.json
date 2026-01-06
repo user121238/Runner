@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(dotnet build:*)",
+      "mcp__fetcher-mcp__fetch_url",
+      "WebSearch",
+      "Bash(dotnet new:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

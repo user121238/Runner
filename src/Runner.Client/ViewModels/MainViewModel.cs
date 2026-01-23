@@ -9,7 +9,7 @@ namespace Runner.Client.ViewModels;
 /// </summary>
 public partial class MainViewModel : BaseViewModel
 {
-    public MainViewModel(ILogger logger, INavigationService navigation) : base(logger, navigation)
+    public MainViewModel(ILogger<MainViewModel> logger, INavigationService navigation) : base(logger, navigation)
     {
     }
 }

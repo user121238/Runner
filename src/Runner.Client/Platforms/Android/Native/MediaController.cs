@@ -49,5 +49,39 @@ namespace Runner.Client.Platforms.Android.Native
 
 
 
+        //private static SoundPool _soundPool;
+        //private static int _soundId;
+
+        //private static bool _isLoaded = false;
+
+        //public static void Init(Context context)
+        //{
+
+        //    var attr = new AudioAttributes.Builder()
+        //        .SetUsage(AudioUsageKind.AssistanceSonification)
+        //        .SetContentType(AudioContentType.Sonification)
+        //        .Build();
+
+        //    _soundPool = new SoundPool.Builder().SetMaxStreams(1).SetAudioAttributes(attr).Build();
+
+        //    _soundId = _soundPool.Load(context, Resource.Raw.beep1, 1);
+
+        //    _soundPool.LoadComplete += (s, e) => _isLoaded = true;
+
+        //}
+
+        ///// <summary>
+        ///// 播放提示音
+        ///// </summary>
+        //public static void PlayTick()
+        //{
+        //    if (_isLoaded)
+        //    {
+        //        _soundPool.Play(_soundId, 0.5f, 0.5f, 1, 0, 1);
+        //    }
+        //}
+
+
+
     }
 }

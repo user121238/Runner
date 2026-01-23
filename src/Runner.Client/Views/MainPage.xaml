@@ -7,7 +7,7 @@
                       Title="{Binding Title}"
                       x:DataType="vm:MainViewModel">
 
-    <Grid RowDefinitions="*,150">
+    <Grid RowDefinitions="*,50">
         <ScrollView>
 
             <VerticalStackLayout Spacing="15" VerticalOptions="Center">
@@ -22,6 +22,14 @@
                 <Button Command="{Binding PlayPauseCommand}"
                         HeightRequest="50"
                         Text="暂停"
+                        WidthRequest="200" />
+                <Button Command="{Binding StartTickCommand}"
+                        HeightRequest="50"
+                        Text="播放提示音"
+                        WidthRequest="200" />
+                <Button Command="{Binding StopTickCommand}"
+                        HeightRequest="50"
+                        Text="暂停提示音"
                         WidthRequest="200" />
             </VerticalStackLayout>
 

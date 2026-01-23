@@ -21,7 +21,7 @@ namespace Runner.Client
                 StartForegroundService(intent);
             }
 
-
+            
 
 
         }

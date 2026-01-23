@@ -58,6 +58,11 @@
     </ItemGroup>
 
     <ItemGroup>
+      <AndroidResource Include="Resources\Raw\beep1.mp3" />
+      <AndroidResource Include="Resources\Raw\beep2.mp3" />
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="Microsoft.Maui.Controls" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" />
     </ItemGroup>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<core:BaseContentPage x:Class="Runner.Client.Views.MainPage"
+                      xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                      xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                      xmlns:core="clr-namespace:DM.Maui.Framework.Core.Mvvm;assembly=DM.Maui.Framework.Core"
+                      xmlns:vm="clr-namespace:Runner.Client.ViewModels"
+                      Title="{Binding Title}"
+                      x:DataType="vm:MainViewModel">
+
+    <Grid RowDefinitions="*,150">
+        <ScrollView>
+
+            <Button HeightRequest="50" Text="下一首" WidthRequest="200" />
+
+
+
+        </ScrollView>
+        <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*">
+            <Button Text="首页" />
+            <Button Grid.Column="1" Text="计划" />
+            <Button Grid.Column="2" Text="记录" />
+            <Button Grid.Column="3" Text="设置" />
+        </Grid>
+    </Grid>
+
+
+
+</core:BaseContentPage>

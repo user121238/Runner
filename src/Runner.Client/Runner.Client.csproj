@@ -34,6 +34,7 @@
         <!--<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>-->
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
+        <NuGetAudit>False</NuGetAudit>
         <!--<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>-->
     </PropertyGroup>
@@ -63,16 +64,21 @@
 
     <ItemGroup>
         <!-- 引用 DM.Maui.Framework 包 -->
-        <PackageReference Include="DM.Maui.Framework.Core" Version="1.0.2" />
-        <PackageReference Include="DM.Maui.Framework.Hardware" Version="1.0.2" />
-        <PackageReference Include="DM.Maui.Framework.Data" Version="1.0.2" />
-        <PackageReference Include="DM.Maui.Framework.Localization" Version="1.0.2" />
-        <PackageReference Include="DM.Maui.Framework.UI" Version="1.0.2" />
-        <PackageReference Include="DM.Maui.Framework.Abstractions" Version="1.0.2" />
+        <PackageReference Include="DM.Maui.Framework.Core" Version="1.0.3" />
+        <PackageReference Include="DM.Maui.Framework.Data" Version="1.0.3" />
+        <PackageReference Include="DM.Maui.Framework.Localization" Version="1.0.3" />
+        <PackageReference Include="DM.Maui.Framework.UI" Version="1.0.3" />
+        <PackageReference Include="DM.Maui.Framework.Abstractions" Version="1.0.3" />
     </ItemGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\Runner.Business\Runner.Business.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <MauiXaml Update="Views\MainPage.xaml">
+        <Generator>MSBuild:Compile</Generator>
+      </MauiXaml>
     </ItemGroup>
 
 </Project>

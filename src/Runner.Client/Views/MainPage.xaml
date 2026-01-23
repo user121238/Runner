@@ -10,7 +10,21 @@
     <Grid RowDefinitions="*,150">
         <ScrollView>
 
-            <Button HeightRequest="50" Text="下一首" WidthRequest="200" />
+            <VerticalStackLayout Spacing="15" VerticalOptions="Center">
+                <Button Command="{Binding PreviousTrackCommand}"
+                        HeightRequest="50"
+                        Text="上一首"
+                        WidthRequest="200" />
+                <Button Command="{Binding NextTrackCommand}"
+                        HeightRequest="50"
+                        Text="下一首"
+                        WidthRequest="200" />
+                <Button Command="{Binding PlayPauseCommand}"
+                        HeightRequest="50"
+                        Text="暂停"
+                        WidthRequest="200" />
+            </VerticalStackLayout>
+
 
 
 

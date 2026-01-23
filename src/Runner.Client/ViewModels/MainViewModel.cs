@@ -1,3 +1,4 @@
+using CommunityToolkit.Mvvm.Input;
 using DM.Maui.Framework.Abstractions.Navigation;
 using DM.Maui.Framework.Core.Mvvm;
 using Microsoft.Extensions.Logging;
@@ -12,4 +13,24 @@ public partial class MainViewModel : BaseViewModel
     public MainViewModel(ILogger<MainViewModel> logger, INavigationService navigation) : base(logger, navigation)
     {
     }
+
+
+    [RelayCommand]
+    private void NextTrack()
+    {
+        Platforms.Android.Native.MediaController.NextTrack();
+    }
+
+    [RelayCommand]
+    private void PreviousTrack()
+    {
+        Platforms.Android.Native.MediaController.PreviousTrack();
+    }
+
+    [RelayCommand]
+    private void PlayPause()
+    {
+        Platforms.Android.Native.MediaController.PlayPause();
+    }
+
 }

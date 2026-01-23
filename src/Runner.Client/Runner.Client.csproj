@@ -58,17 +58,17 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.Maui.Controls" Version="10.0.20" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+        <PackageReference Include="Microsoft.Maui.Controls" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Debug" />
     </ItemGroup>
 
     <ItemGroup>
         <!-- 引用 DM.Maui.Framework 包 -->
-        <PackageReference Include="DM.Maui.Framework.Core" Version="1.0.3" />
-        <PackageReference Include="DM.Maui.Framework.Data" Version="1.0.3" />
-        <PackageReference Include="DM.Maui.Framework.Localization" Version="1.0.3" />
-        <PackageReference Include="DM.Maui.Framework.UI" Version="1.0.3" />
-        <PackageReference Include="DM.Maui.Framework.Abstractions" Version="1.0.3" />
+        <PackageReference Include="DM.Maui.Framework.Core" />
+        <PackageReference Include="DM.Maui.Framework.Data" />
+        <PackageReference Include="DM.Maui.Framework.Localization" />
+        <PackageReference Include="DM.Maui.Framework.UI" />
+        <PackageReference Include="DM.Maui.Framework.Abstractions" />
     </ItemGroup>
 
     <ItemGroup>

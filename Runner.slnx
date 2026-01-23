@@ -1,9 +1,10 @@
 <Solution>
-  <Folder Name="/Solution/" />
+  <Folder Name="/Solution/">
+    <File Path="Directory.Packages.props" />
+  </Folder>
   <Project Path="src/Runner.Business/Runner.Business.csproj" Id="98653d1c-cadb-45cc-94c5-d2096c0ed9e6" />
   <Project Path="src/Runner.Client/Runner.Client.csproj" Id="78828a18-7693-409e-8892-8f3f341aa42c">
     <Deploy Solution="Debug|*" />
   </Project>
   <Project Path="src/Runner.Core/Runner.Core.csproj" Id="c2bff298-5eb6-4650-b355-91788a5e5656" />
-  <Project Path="src/Runner.Lib/Runner.Lib.csproj" Id="6b98ce12-86b8-4f02-913b-a9093cba9af1" />
 </Solution>

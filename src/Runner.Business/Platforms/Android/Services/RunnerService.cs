@@ -1,10 +1,10 @@
-﻿using _Microsoft.Android.Resource.Designer;
+using _Microsoft.Android.Resource.Designer;
 using Android.App;
 using Android.Content;
 using Android.Content.PM;
 using Android.OS;
 
-namespace Runner.Client.Platforms.Android.Services
+namespace Runner.Business.Platforms.Android.Services
 {
 
     [Service(ForegroundServiceType = ForegroundService.TypeLocation | ForegroundService.TypeMediaPlayback, Exported = false, Enabled = true, Name = "com.eric.runner.RunnerService")]
@@ -23,13 +23,17 @@ namespace Runner.Client.Platforms.Android.Services
 
 
             // 2. 构建通知，点击通知可以回到应用
-            var pendingIntent = PendingIntent.GetActivity(this, 0, new Intent(this, typeof(MainActivity)),
-                PendingIntentFlags.Immutable);
+            // 注意：这里需要 MainActivity 的类型，但它在 Client 层
+            // 可以通过配置或反射来获取
+            var mainActivityType = Type.GetType("Runner.Client.Platforms.Android.MainActivity, Runner.Client");
+            var pendingIntent = mainActivityType != null
+                ? PendingIntent.GetActivity(this, 0, new Intent(this, mainActivityType), PendingIntentFlags.Immutable)
+                : null;
 
             var notification = new Notification.Builder(this, CHANNEL_ID)
                 .SetContentTitle("Runner 服务正在运行")
                 .SetContentText("点击返回应用")
-                .SetSmallIcon(ResourceConstant.Mipmap.appicon)
+                //.SetSmallIcon(ResourceConstant.Mipmap.appicon)
                 .SetContentIntent(pendingIntent)
                 .SetOngoing(true)
                 .Build();
@@ -61,7 +65,7 @@ namespace Runner.Client.Platforms.Android.Services
             {
                 while (await timer.WaitForNextTickAsync())
                 {
-                    
+
                 }
             }
         }

@@ -1,12 +1,12 @@
 using System.Diagnostics;
 
-namespace Runner.Client.Platforms.Android.Native
+namespace Runner.Business.Platforms.Android.Permissions
 {
     /// <summary>
     /// 活动识别权限
     /// Android 10+ 需要此权限才能使用计步传感器
     /// </summary>
-    public class ActivityRecognitionPermission : Permissions.BasePlatformPermission
+    public class ActivityRecognitionPermission : Microsoft.Maui.ApplicationModel.Permissions.BasePlatformPermission
     {
         public override (string androidPermission, bool isRuntime)[] RequiredPermissions =>
             new[]

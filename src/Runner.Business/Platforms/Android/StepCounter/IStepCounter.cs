@@ -1,12 +1,17 @@
 using Android.Content;
 
-namespace Runner.Client.Platforms.Android.Native
+namespace Runner.Business.Platforms.Android.StepCounter
 {
     /// <summary>
-    /// 计步器接口
+    /// Android 平台计步器接口 - 扩展业务接口，添加平台特定的初始化方法
     /// </summary>
     public interface IStepCounter : IDisposable
     {
+        /// <summary>
+        /// 初始化（Android 平台特定）
+        /// </summary>
+        void Init(Context context);
+
         /// <summary>
         /// 步数变化事件
         /// </summary>
@@ -16,11 +21,6 @@ namespace Runner.Client.Platforms.Android.Native
         /// 步频变化事件（每分钟步数）
         /// </summary>
         event Action<double>? OnStepFrequencyChanged;
-
-        /// <summary>
-        /// 初始化
-        /// </summary>
-        void Init(Context context);
 
         /// <summary>
         /// 开始计步

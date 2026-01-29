@@ -17,7 +17,7 @@ namespace Runner.Client
 
             if (result == PermissionStatus.Granted)
             {
-                var intent = new Intent(Platform.CurrentActivity, typeof(Runner.Client.Platforms.Android.Services.RunnerService));
+                var intent = new Intent(Platform.CurrentActivity!, typeof(Runner.Business.Platforms.Android.Services.RunnerService));
                 StartForegroundService(intent);
             }
 

@@ -1,8 +1,10 @@
 using Android.Content;
 using Android.Hardware;
-using System.Diagnostics;
+using Android.OS;
+using Runner.Core.SignalProcessing;
+using Debug = System.Diagnostics.Debug;
 
-namespace Runner.Client.Platforms.Android.Native
+namespace Runner.Business.Platforms.Android.StepCounter
 {
     /// <summary>
     /// 加速度传感器计步实现
@@ -16,20 +18,29 @@ namespace Runner.Client.Platforms.Android.Native
         private int _eventCount = 0;
 
         // 峰值检测参数
-        private const float PEAK_THRESHOLD = 12.0f;
-        private const long MIN_STEP_INTERVAL_MS = 200;
-        private const long STEP_FREQUENCY_WINDOW_MS = 10000;
-
-        // 低通滤波
+        private const float PEAK_THRESHOLD = 11.5f;
+        private const long MIN_STEP_INTERVAL_MS = 300;
         private const float FILTER_ALPHA = 0.1f;
-        private float _filteredValue;
 
-        // 峰值检测状态
-        private long _lastPeakTime;
-        private readonly Queue<long> _stepTimestamps = new();
+        // 信号处理
+        private readonly LowPassFilter _lowPassFilter;
+        private readonly PeakDetector _peakDetector;
+
+        // 步频计算
+        private readonly FrequencyCalculator _cadenceCalc = new();
+
+        // 定时器相关
+        private System.Threading.Timer? _updateTimer;
+        private const int UPDATE_INTERVAL_MS = 1000; // 每1秒更新一次
 
         public event Action<int>? OnStepCountChanged;
         public event Action<double>? OnStepFrequencyChanged;
+
+        public AccelerometerStepCounter()
+        {
+            _lowPassFilter = new LowPassFilter(FILTER_ALPHA);
+            _peakDetector = new PeakDetector(PEAK_THRESHOLD, MIN_STEP_INTERVAL_MS);
+        }
 
         public void Init(Context context)
         {
@@ -68,11 +79,20 @@ namespace Runner.Client.Platforms.Android.Native
                 Debug.WriteLine("[AccelerometerStepCounter] 错误: 传感器注册失败");
                 throw new InvalidOperationException("加速度传感器注册失败");
             }
+
+            // 启动定时器，每1秒更新一次步频
+            _updateTimer = new System.Threading.Timer(OnTimerUpdate, null, UPDATE_INTERVAL_MS, UPDATE_INTERVAL_MS);
+            Debug.WriteLine("[AccelerometerStepCounter] 步频更新定时器已启动");
         }
 
         public void Stop()
         {
             Debug.WriteLine("[AccelerometerStepCounter] 停止传感器");
+
+            // 停止定时器
+            _updateTimer?.Dispose();
+            _updateTimer = null;
+
             _sensorManager?.UnregisterListener(this);
         }
 
@@ -94,51 +114,57 @@ namespace Runner.Client.Platforms.Android.Native
             float magnitude = (float)Math.Sqrt(x * x + y * y + z * z);
 
             // 低通滤波
-            _filteredValue = FILTER_ALPHA * magnitude + (1 - FILTER_ALPHA) * _filteredValue;
+            float filteredValue = _lowPassFilter.Filter(magnitude);
 
             // 每100个事件输出一次调试信息
             if (_eventCount % 100 == 1)
             {
-                Debug.WriteLine($"[AccelerometerStepCounter] 事件#{_eventCount} - 原始: {magnitude:F2}, 滤波: {_filteredValue:F2}, 阈值: {PEAK_THRESHOLD}");
+                Debug.WriteLine($"[AccelerometerStepCounter] 事件#{_eventCount} - 原始: {magnitude:F2}, 滤波: {filteredValue:F2}");
             }
 
             // 峰值检测
-            DetectStep(_filteredValue, e.Timestamp);
+            DetectStep(filteredValue, e.Timestamp);
         }
 
         private void DetectStep(float value, long timestampNs)
         {
-            if (value < PEAK_THRESHOLD)
-                return;
-
             long timestampMs = timestampNs / 1_000_000;
-            long timeSinceLastPeak = timestampMs - _lastPeakTime;
 
-            if (timeSinceLastPeak < MIN_STEP_INTERVAL_MS)
-                return;
-
-            // 检测到一步
-            _stepCount++;
-            _lastPeakTime = timestampMs;
-            _stepTimestamps.Enqueue(timestampMs);
-
-            Debug.WriteLine($"[AccelerometerStepCounter] 检测到步数 #{_stepCount} - 峰值: {value:F2}, 间隔: {timeSinceLastPeak}ms");
-
-            // 清理过期时间戳
-            while (_stepTimestamps.Count > 0 &&
-                   timestampMs - _stepTimestamps.Peek() > STEP_FREQUENCY_WINDOW_MS)
+            // 使用峰值检测器
+            if (_peakDetector.DetectPeak(value, timestampMs))
             {
-                _stepTimestamps.Dequeue();
+                // 确认检测到一步
+                _stepCount++;
+
+                _cadenceCalc.AddEvent(timestampMs);
+
+                Debug.WriteLine($"[AccelerometerStepCounter] ✓✓✓ 确认步数 #{_stepCount}");
+
+                // 立即更新步数
+                OnStepCountChanged?.Invoke(_stepCount);
             }
+        }
 
-            // 计算步频
-            double windowMinutes = STEP_FREQUENCY_WINDOW_MS / 60000.0;
-            double frequency = _stepTimestamps.Count / windowMinutes;
+        private void OnTimerUpdate(object? state)
+        {
+            try
+            {
+                Debug.WriteLine("[AccelerometerStepCounter] 定时器触发");
 
-            Debug.WriteLine($"[AccelerometerStepCounter] 步频: {frequency:F1} SPM");
+                long currentTimeMs = SystemClock.ElapsedRealtime();
 
-            OnStepCountChanged?.Invoke(_stepCount);
-            OnStepFrequencyChanged?.Invoke(frequency);
+                // 计算步频
+                double frequency = _cadenceCalc.GetFrequency(currentTimeMs);
+
+                Debug.WriteLine($"[AccelerometerStepCounter] 计算得到步频: {frequency:F1} SPM");
+
+                // 触发步频更新事件
+                OnStepFrequencyChanged?.Invoke(frequency);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[AccelerometerStepCounter] 定时器更新异常: {ex}");
+            }
         }
 
         public void OnAccuracyChanged(Sensor? sensor, SensorStatus accuracy)
@@ -149,10 +175,14 @@ namespace Runner.Client.Platforms.Android.Native
         public new void Dispose()
         {
             Debug.WriteLine($"[AccelerometerStepCounter] 释放资源 - 共收到 {_eventCount} 个事件, 检测到 {_stepCount} 步");
+
+            // 停止定时器
+            _updateTimer?.Dispose();
+            _updateTimer = null;
+
             Stop();
             _sensorManager = null;
             _sensor = null;
-            _stepTimestamps.Clear();
             OnStepCountChanged = null;
             OnStepFrequencyChanged = null;
             base.Dispose();

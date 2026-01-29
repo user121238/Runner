@@ -1,4 +1,4 @@
-namespace Runner.Client.Models;
+namespace Runner.Business.Models;
 
 /// <summary>
 /// 用户模型

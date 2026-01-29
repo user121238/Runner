@@ -6,7 +6,8 @@
       "mcp__fetcher-mcp__fetch_url",
       "WebSearch",
       "Bash(dotnet new:*)",
-      "Bash(Select-String -Pattern \"error|exception|fail\" -Context 2)"
+      "Bash(Select-String -Pattern \"error|exception|fail\" -Context 2)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,8 +1,10 @@
 using Android.Content;
 using Android.Hardware;
-using System.Diagnostics;
+using Android.OS;
+using Runner.Core.SignalProcessing;
+using Debug = System.Diagnostics.Debug;
 
-namespace Runner.Client.Platforms.Android.Native
+namespace Runner.Business.Platforms.Android.StepCounter
 {
     /// <summary>
     /// 硬件计步传感器实现
@@ -16,12 +18,15 @@ namespace Runner.Client.Platforms.Android.Native
 
         // 步数相关
         private int _totalSteps;
-        private int _counterEventCount = 0;
+        private int _counterEventCount;
 
         // 步频相关
-        private const long STEP_FREQUENCY_WINDOW_MS = 2000; // 2秒窗口
-        private readonly Queue<long> _stepTimestamps = new();
-        private int _detectorEventCount = 0;
+        private readonly FrequencyCalculator _cadenceCalc = new();
+        private int _detectorEventCount;
+
+        // 定时器相关
+        private Timer? _updateTimer;
+        private const int UPDATE_INTERVAL_MS = 1000; // 每1秒更新一次
 
         public event Action<int>? OnStepCountChanged;
         public event Action<double>? OnStepFrequencyChanged;
@@ -79,13 +84,23 @@ namespace Runner.Client.Platforms.Android.Native
                 bool counterRegistered = _sensorManager.RegisterListener(this, _stepCounterSensor, SensorDelay.Normal);
                 Debug.WriteLine($"[HardwareStepCounter] 计步传感器(备份)注册结果: {counterRegistered}");
             }
+
+            // 启动定时器，每1秒更新一次步频
+            _updateTimer = new Timer(OnTimerUpdate, null, UPDATE_INTERVAL_MS, UPDATE_INTERVAL_MS);
+            Debug.WriteLine("[HardwareStepCounter] 步频更新定时器已启动");
         }
 
         public void Stop()
         {
             Debug.WriteLine("[HardwareStepCounter] 停止传感器");
+
+            // 停止定时器
+            _updateTimer?.Dispose();
+            _updateTimer = null;
+
             _sensorManager?.UnregisterListener(this);
         }
+
 
         public void OnSensorChanged(SensorEvent? e)
         {
@@ -96,6 +111,7 @@ namespace Runner.Client.Platforms.Android.Native
             if (e.Sensor.Type == SensorType.StepCounter)
             {
                 HandleStepCounter(e);
+
             }
             else if (e.Sensor.Type == SensorType.StepDetector)
             {
@@ -107,7 +123,7 @@ namespace Runner.Client.Platforms.Android.Native
         {
             _counterEventCount++;
 
-            if (e.Values.Count == 0)
+            if (e.Values!.Count == 0)
                 return;
 
             int hardwareSteps = (int)e.Values[0];
@@ -122,27 +138,40 @@ namespace Runner.Client.Platforms.Android.Native
             _totalSteps++;
 
             long timestampMs = e.Timestamp / 1_000_000;
-            _stepTimestamps.Enqueue(timestampMs);
+
+            _cadenceCalc.AddEvent(timestampMs);
 
             Debug.WriteLine($"[HardwareStepCounter] 检测到第 {_totalSteps} 步 - 时间戳: {timestampMs}");
 
-            // 清理过期时间戳（2秒窗口外）
-            while (_stepTimestamps.Count > 0 &&
-                   timestampMs - _stepTimestamps.Peek() > STEP_FREQUENCY_WINDOW_MS)
-            {
-                _stepTimestamps.Dequeue();
-            }
-
-            // 计算步频（每分钟步数）
-            double windowMinutes = STEP_FREQUENCY_WINDOW_MS / 60000.0;
-            double frequency = _stepTimestamps.Count / windowMinutes;
-
-            Debug.WriteLine($"[HardwareStepCounter] 步频: {frequency:F1} SPM (2秒窗口内步数: {_stepTimestamps.Count})");
-
-            // 触发事件
+            // 立即更新步数
             OnStepCountChanged?.Invoke(_totalSteps);
-            OnStepFrequencyChanged?.Invoke(frequency);
+
+            // 步频由定时器更新，这里不更新
         }
+
+        private void OnTimerUpdate(object? state)
+        {
+            try
+            {
+                Debug.WriteLine("[HardwareStepCounter] 定时器触发");
+
+                long currentTimeMs = SystemClock.ElapsedRealtime();
+                Debug.WriteLine($"[HardwareStepCounter] 当前时间: {currentTimeMs}");
+
+                // 计算步频
+                double frequency = _cadenceCalc.GetFrequency(currentTimeMs);
+
+                Debug.WriteLine($"[HardwareStepCounter] 计算得到步频: {frequency:F1} SPM");
+
+                // 触发步频更新事件
+                OnStepFrequencyChanged?.Invoke(frequency);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[HardwareStepCounter] 定时器更新异常: {ex}");
+            }
+        }
+
 
         public void OnAccuracyChanged(Sensor? sensor, SensorStatus accuracy)
         {
@@ -152,11 +181,15 @@ namespace Runner.Client.Platforms.Android.Native
         public new void Dispose()
         {
             Debug.WriteLine($"[HardwareStepCounter] 释放资源 - 计步事件: {_counterEventCount}, 步态检测事件: {_detectorEventCount}");
+
+            // 停止定时器
+            _updateTimer?.Dispose();
+            _updateTimer = null;
+
             Stop();
             _sensorManager = null;
             _stepCounterSensor = null;
             _stepDetectorSensor = null;
-            _stepTimestamps.Clear();
             OnStepCountChanged = null;
             OnStepFrequencyChanged = null;
             base.Dispose();

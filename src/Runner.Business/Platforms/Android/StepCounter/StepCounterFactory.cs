@@ -2,7 +2,7 @@ using Android.Content;
 using Android.Hardware;
 using System.Diagnostics;
 
-namespace Runner.Client.Platforms.Android.Native
+namespace Runner.Business.Platforms.Android.StepCounter
 {
     /// <summary>
     /// 计步器工厂
@@ -11,14 +11,19 @@ namespace Runner.Client.Platforms.Android.Native
     public static class StepCounterFactory
     {
         /// <summary>
+        /// 强制使用加速度传感器（用于测试）
+        /// </summary>
+        public static bool ForceAccelerometer { get; set; } = false;
+
+        /// <summary>
         /// 创建计步器实例
         /// </summary>
         /// <returns>计步器实例</returns>
-        public static IStepCounter Create()
+        public static IStepCounter Create(Context context)
         {
             Debug.WriteLine("[StepCounterFactory] 开始创建计步器");
+            Debug.WriteLine($"[StepCounterFactory] 强制使用加速度传感器: {ForceAccelerometer}");
 
-            var context = Platform.CurrentActivity!;
             var sensorManager = (SensorManager?)context.GetSystemService(Context.SensorService);
 
             if (sensorManager == null)
@@ -40,27 +45,35 @@ namespace Runner.Client.Platforms.Android.Native
                 }
             }
 
-            // 优先使用硬件计步传感器
-            var stepDetectorSensor = sensorManager.GetDefaultSensor(SensorType.StepDetector);
-            var stepCounterSensor = sensorManager.GetDefaultSensor(SensorType.StepCounter);
-
-            if (stepDetectorSensor != null)
+            // 如果强制使用加速度传感器，直接跳到加速度传感器
+            if (!ForceAccelerometer)
             {
-                Debug.WriteLine($"[StepCounterFactory] 找到步态检测传感器: {stepDetectorSensor.Name}");
-                Debug.WriteLine($"[StepCounterFactory] - Vendor: {stepDetectorSensor.Vendor}");
+                // 优先使用硬件计步传感器
+                var stepDetectorSensor = sensorManager.GetDefaultSensor(SensorType.StepDetector);
+                var stepCounterSensor = sensorManager.GetDefaultSensor(SensorType.StepCounter);
+
+                if (stepDetectorSensor != null)
+                {
+                    Debug.WriteLine($"[StepCounterFactory] 找到步态检测传感器: {stepDetectorSensor.Name}");
+                    Debug.WriteLine($"[StepCounterFactory] - Vendor: {stepDetectorSensor.Vendor}");
+                }
+
+                if (stepCounterSensor != null)
+                {
+                    Debug.WriteLine($"[StepCounterFactory] 找到计步传感器(备份): {stepCounterSensor.Name}");
+                }
+
+                if (stepDetectorSensor != null)
+                {
+                    var counter = new HardwareStepCounter();
+                    counter.Init(context);
+                    Debug.WriteLine("[StepCounterFactory] 硬件步态检测传感器初始化成功");
+                    return counter;
+                }
             }
-
-            if (stepCounterSensor != null)
+            else
             {
-                Debug.WriteLine($"[StepCounterFactory] 找到计步传感器(备份): {stepCounterSensor.Name}");
-            }
-
-            if (stepDetectorSensor != null)
-            {
-                var counter = new HardwareStepCounter();
-                counter.Init(context);
-                Debug.WriteLine("[StepCounterFactory] 硬件步态检测传感器初始化成功");
-                return counter;
+                Debug.WriteLine("[StepCounterFactory] 跳过硬件传感器检查，强制使用加速度传感器");
             }
 
             Debug.WriteLine("[StepCounterFactory] 未找到硬件计步传感器，尝试加速度传感器");

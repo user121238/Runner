@@ -1,4 +1,4 @@
-﻿// 资源设计器，用于访问Android资源
+// 资源设计器，用于访问Android资源
 using _Microsoft.Android.Resource.Designer;
 // Android媒体相关类，用于音频播放
 using Android.Media;
@@ -13,7 +13,7 @@ using Debug = System.Diagnostics.Debug;
 // 数学运算类
 using Math = System.Math;
 
-namespace Runner.Client.Platforms.Android.Native
+namespace Runner.Business.Platforms.Android.Media
 {
     /// <summary>
     /// 步频提示音播放器
@@ -25,47 +25,47 @@ namespace Runner.Client.Platforms.Android.Native
         /// 音频池，用于高效播放短音频片段
         /// </summary>
         private SoundPool? _soundPool;
-        
+
         /// <summary>
         /// 提示音的ID
         /// </summary>
         private int _soundId = -1;
-        
+
         /// <summary>
         /// 音频是否已加载完成
         /// </summary>
         private volatile bool _isLoaded;
-        
+
         /// <summary>
         /// 最大并发播放流数量
         /// </summary>
         private const int MAX_STREAMS = 1;
-        
+
         /// <summary>
         /// 线程锁，用于保证线程安全
         /// </summary>
         private readonly Lock _lockObject = new();
-        
+
         /// <summary>
         /// Android Handler，用于在主线程中调度定时任务
         /// </summary>
         private Handler? _handler;
-        
+
         /// <summary>
         /// 定时执行的Runnable任务
         /// </summary>
         private Runnable? _tickRunnable;
-        
+
         /// <summary>
         /// 下一次节拍播放的时间戳
         /// </summary>
         private long _nextTickTime;
-        
+
         /// <summary>
         /// 是否正在运行
         /// </summary>
         private bool _running;
-        
+
         /// <summary>
         /// 节拍间隔时间（毫秒）
         /// </summary>
@@ -75,7 +75,7 @@ namespace Runner.Client.Platforms.Android.Native
         /// 初始化音频播放器
         /// 创建SoundPool并加载提示音资源
         /// </summary>
-        public void Init()
+        public void Init(int soundId)
         {
             var context = Application.Context;
 
@@ -105,7 +105,8 @@ namespace Runner.Client.Platforms.Android.Native
             _soundPool.LoadComplete += OnLoadComplete;
 
             // 加载提示音资源
-            _soundId = _soundPool.Load(context, ResourceConstant.Raw.beep3, 1);
+            // _soundId = _soundPool.Load(context, ResourceConstant.Raw.beep3, 1);
+            _soundId = _soundPool.Load(context, soundId, 1);
 
             Debug.WriteLine($"Loading sound with ID: {_soundId}");
 
@@ -120,13 +121,13 @@ namespace Runner.Client.Platforms.Android.Native
         {
             // 验证输入参数
             if (spm <= 0) return;
-            
+
             // 先停止之前的播放
             Stop();
-            
+
             // 计算节拍间隔时间（毫秒）
             _intervalMs = (int)(60000.0 / spm);
-            
+
             // 设置下一个节拍的播放时间
             _nextTickTime = SystemClock.UptimeMillis();
 
@@ -169,7 +170,7 @@ namespace Runner.Client.Platforms.Android.Native
         {
             // 设置运行标志为false
             _running = false;
-            
+
             // 从Handler的消息队列中移除定时任务
             _handler?.RemoveCallbacks(_tickRunnable!);
         }
@@ -181,7 +182,7 @@ namespace Runner.Client.Platforms.Android.Native
         {
             // 获取当前的_soundPool实例以避免并发问题
             var pool = _soundPool;
-            
+
             // 检查音频是否已加载完成以及相关资源是否有效
             if (_isLoaded && pool != null && _soundId != -1)
             {
@@ -198,7 +199,7 @@ namespace Runner.Client.Platforms.Android.Native
         {
             // 先停止播放
             Stop();
-            
+
             // 使用锁确保线程安全
             lock (_lockObject)
             {
@@ -207,14 +208,14 @@ namespace Runner.Client.Platforms.Android.Native
                 {
                     // 移除音频加载完成回调
                     _soundPool.LoadComplete -= OnLoadComplete;
-                    
+
                     // 释放SoundPool
                     _soundPool.Release();
-                    
+
                     // 将引用设为null
                     _soundPool = null;
                 }
-                
+
                 // 重置加载标志
                 _isLoaded = false;
             }
@@ -233,7 +234,7 @@ namespace Runner.Client.Platforms.Android.Native
             {
                 // 设置音频加载完成标志
                 _isLoaded = true;
-                
+
                 // 输出调试信息
                 Debug.WriteLine("Sound loaded successfully");
             }

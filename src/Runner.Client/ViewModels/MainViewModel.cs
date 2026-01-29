@@ -1,15 +1,18 @@
+using _Microsoft.Android.Resource.Designer;
 using CommunityToolkit.Mvvm.Input;
 using DM.Maui.Framework.Abstractions.Navigation;
 using DM.Maui.Framework.Core.Mvvm;
 using Microsoft.Extensions.Logging;
-using Runner.Client.Platforms.Android.Native;
+using Runner.Business.Platforms.Android.StepCounter;
+using Runner.Business.Platforms.Android.Media;
+using Runner.Business.Platforms.Android.Permissions;
 
 namespace Runner.Client.ViewModels;
 
 /// <summary>
 /// 主页 ViewModel - 展示框架核心功能
 /// </summary>
-public partial class MainViewModel : BaseViewModel, IDisposable
+public partial class MainViewModel : BaseViewModel
 {
     private readonly CadencePlay _cadencePlay;
     private IStepCounter? _stepCounter;
@@ -24,12 +27,13 @@ public partial class MainViewModel : BaseViewModel, IDisposable
     {
         _cadencePlay = new CadencePlay();
         // 延迟初始化音频资源，避免阻塞UI线程
-        Task.Run(() => _cadencePlay.Init());
-        
+
+        Task.Run(() => _cadencePlay.Init(ResourceConstant.Raw.beep3));
+
         // 初始化计步器
         InitPedometer();
     }
-    
+
     private void InitPedometer()
     {
         try
@@ -105,7 +109,8 @@ public partial class MainViewModel : BaseViewModel, IDisposable
         try
         {
             System.Diagnostics.Debug.WriteLine("[MainViewModel] 调用工厂创建计步器");
-            _stepCounter = StepCounterFactory.Create();
+            var context = Platform.CurrentActivity!;
+            _stepCounter = StepCounterFactory.Create(context);
 
             // 订阅事件
             _stepCounter.OnStepCountChanged += OnStepCountChanged;
@@ -152,19 +157,22 @@ public partial class MainViewModel : BaseViewModel, IDisposable
     [RelayCommand]
     private void NextTrack()
     {
-        MediaController.NextTrack();
+        var context = Platform.CurrentActivity!;
+        MediaController.NextTrack(context);
     }
 
     [RelayCommand]
     private void PreviousTrack()
     {
-        MediaController.PreviousTrack();
+        var context = Platform.CurrentActivity!;
+        MediaController.PreviousTrack(context);
     }
 
     [RelayCommand]
     private void PlayPause()
     {
-        MediaController.PlayPause();
+        var context = Platform.CurrentActivity!;
+        MediaController.PlayPause(context);
     }
 
     [RelayCommand]
@@ -180,29 +188,29 @@ public partial class MainViewModel : BaseViewModel, IDisposable
     }
 
     #region 计步器相关属性
-    
+
     public int StepCount
     {
         get => _stepCount;
         private set => SetProperty(ref _stepCount, value);
     }
-    
+
     public double StepFrequency
     {
         get => _stepFrequency;
         private set => SetProperty(ref _stepFrequency, value);
     }
-    
+
     public string PedometerStatus
     {
         get => _pedometerStatus;
         private set => SetProperty(ref _pedometerStatus, value);
     }
-    
+
     #endregion
-    
+
     #region 计步器相关命令
-    
+
     [RelayCommand]
     private void StartPedometer()
     {
@@ -256,18 +264,95 @@ public partial class MainViewModel : BaseViewModel, IDisposable
             System.Diagnostics.Debug.WriteLine($"[MainViewModel] 停止失败: {ex}");
         }
     }
-    
+
     [RelayCommand]
     private void ResetStepCount()
     {
         StepCount = 0;
         StepFrequency = 0.0;
     }
-    
-    #endregion
-    
-    public void Dispose()
+
+    [RelayCommand]
+    private void SwitchToAccelerometer()
     {
+        System.Diagnostics.Debug.WriteLine("[MainViewModel] 切换到加速度传感器");
+
+        try
+        {
+            // 停止当前计步器
+            if (_stepCounter != null)
+            {
+                if (_isPedometerActive)
+                {
+                    _stepCounter.Stop();
+                    _isPedometerActive = false;
+                }
+
+                _stepCounter.OnStepCountChanged -= OnStepCountChanged;
+                _stepCounter.OnStepFrequencyChanged -= OnStepFrequencyChanged;
+                _stepCounter.Dispose();
+                _stepCounter = null;
+            }
+
+            // 强制使用加速度传感器
+            StepCounterFactory.ForceAccelerometer = true;
+
+            // 重新创建计步器
+            CreateStepCounter();
+
+            System.Diagnostics.Debug.WriteLine("[MainViewModel] 已切换到加速度传感器");
+        }
+        catch (Exception ex)
+        {
+            _pedometerStatus = $"切换失败: {ex.Message}";
+            Logger?.LogError(ex, "切换到加速度传感器失败");
+            System.Diagnostics.Debug.WriteLine($"[MainViewModel] 切换失败: {ex}");
+        }
+    }
+
+    [RelayCommand]
+    private void SwitchToHardware()
+    {
+        System.Diagnostics.Debug.WriteLine("[MainViewModel] 切换到硬件传感器");
+
+        try
+        {
+            // 停止当前计步器
+            if (_stepCounter != null)
+            {
+                if (_isPedometerActive)
+                {
+                    _stepCounter.Stop();
+                    _isPedometerActive = false;
+                }
+
+                _stepCounter.OnStepCountChanged -= OnStepCountChanged;
+                _stepCounter.OnStepFrequencyChanged -= OnStepFrequencyChanged;
+                _stepCounter.Dispose();
+                _stepCounter = null;
+            }
+
+            // 使用硬件传感器
+            StepCounterFactory.ForceAccelerometer = false;
+
+            // 重新创建计步器
+            CreateStepCounter();
+
+            System.Diagnostics.Debug.WriteLine("[MainViewModel] 已切换到硬件传感器");
+        }
+        catch (Exception ex)
+        {
+            _pedometerStatus = $"切换失败: {ex.Message}";
+            Logger?.LogError(ex, "切换到硬件传感器失败");
+            System.Diagnostics.Debug.WriteLine($"[MainViewModel] 切换失败: {ex}");
+        }
+    }
+
+    #endregion
+
+    protected override void Dispose(bool disposing)
+    {
+
         _cadencePlay?.Dispose();
 
         if (_stepCounter != null)
@@ -277,5 +362,9 @@ public partial class MainViewModel : BaseViewModel, IDisposable
             _stepCounter.Dispose();
             _stepCounter = null;
         }
+
+        base.Dispose(disposing);
+
     }
+
 }

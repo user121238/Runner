@@ -81,6 +81,23 @@
                         </StackLayout>
                     </VerticalStackLayout>
                 </Border>
+
+                <!--  传感器切换  -->
+                <Border Padding="15" BackgroundColor="LightCoral">
+                    <VerticalStackLayout Spacing="10">
+                        <Label FontAttributes="Bold" FontSize="18" Text="传感器切换" />
+                        <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
+                            <Button Command="{Binding SwitchToHardwareCommand}"
+                                    HeightRequest="50"
+                                    Text="硬件传感器"
+                                    WidthRequest="120" />
+                            <Button Command="{Binding SwitchToAccelerometerCommand}"
+                                    HeightRequest="50"
+                                    Text="加速度传感器"
+                                    WidthRequest="120" />
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
             </VerticalStackLayout>
 
 

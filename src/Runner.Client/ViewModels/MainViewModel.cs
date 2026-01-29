@@ -16,7 +16,8 @@ public partial class MainViewModel : BaseViewModel, IDisposable
     public MainViewModel(ILogger<MainViewModel> logger, INavigationService navigation) : base(logger, navigation)
     {
         _cadencePlay = new CadencePlay();
-        _cadencePlay.Init();
+        // 延迟初始化音频资源，避免阻塞UI线程
+        Task.Run(() => _cadencePlay.Init());
     }
 
     [RelayCommand]

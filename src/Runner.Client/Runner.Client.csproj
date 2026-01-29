@@ -58,8 +58,13 @@
     </ItemGroup>
 
     <ItemGroup>
+      <MauiAsset Remove="Resources\Raw\beep3.wav" />
+    </ItemGroup>
+
+    <ItemGroup>
       <AndroidResource Include="Resources\Raw\beep1.mp3" />
       <AndroidResource Include="Resources\Raw\beep2.mp3" />
+      <AndroidResource Include="Resources\Raw\beep3.wav" />
     </ItemGroup>
 
     <ItemGroup>

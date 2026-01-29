@@ -10,29 +10,78 @@
     <Grid RowDefinitions="*,50">
         <ScrollView>
 
-            <VerticalStackLayout Spacing="15" VerticalOptions="Center">
-                <Button Command="{Binding PreviousTrackCommand}"
-                        HeightRequest="50"
-                        Text="上一首"
-                        WidthRequest="200" />
-                <Button Command="{Binding NextTrackCommand}"
-                        HeightRequest="50"
-                        Text="下一首"
-                        WidthRequest="200" />
-                <Button Command="{Binding PlayPauseCommand}"
-                        HeightRequest="50"
-                        Text="暂停"
-                        WidthRequest="200" />
-                <Button Command="{Binding StartTickCommand}"
-                        HeightRequest="50"
-                        Text="播放提示音"
-                        WidthRequest="200" />
-                <Button Command="{Binding StopTickCommand}"
-                        HeightRequest="50"
-                        Text="暂停提示音"
-                        WidthRequest="200" />
-            </VerticalStackLayout>
+            <VerticalStackLayout Padding="20" Spacing="15" VerticalOptions="Start">
+                <!--  媒体控制按钮  -->
+                <Frame Padding="15" BackgroundColor="LightGray">
+                    <VerticalStackLayout Spacing="10">
+                        <Label FontAttributes="Bold" FontSize="18" Text="媒体控制" />
+                        <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
+                            <Button Command="{Binding PreviousTrackCommand}"
+                                    HeightRequest="50"
+                                    Text="上一首"
+                                    WidthRequest="100" />
+                            <Button Command="{Binding PlayPauseCommand}"
+                                    HeightRequest="50"
+                                    Text="播放/暂停"
+                                    WidthRequest="100" />
+                            <Button Command="{Binding NextTrackCommand}"
+                                    HeightRequest="50"
+                                    Text="下一首"
+                                    WidthRequest="100" />
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Frame>
 
+                <!--  节拍器控制按钮  -->
+                <Frame Padding="15" BackgroundColor="LightBlue">
+                    <VerticalStackLayout Spacing="10">
+                        <Label FontAttributes="Bold" FontSize="18" Text="节拍器控制" />
+                        <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
+                            <Button Command="{Binding StartTickCommand}"
+                                    HeightRequest="50"
+                                    Text="开始节拍"
+                                    WidthRequest="120" />
+                            <Button Command="{Binding StopTickCommand}"
+                                    HeightRequest="50"
+                                    Text="停止节拍"
+                                    WidthRequest="120" />
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!--  计步器控制按钮  -->
+                <Border Padding="15" BackgroundColor="LightGreen">
+                    <VerticalStackLayout Spacing="10">
+                        <Label FontAttributes="Bold" FontSize="18" Text="计步器控制" />
+                        <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
+                            <Button Command="{Binding StartPedometerCommand}"
+                                    HeightRequest="50"
+                                    Text="开始计步"
+                                    WidthRequest="100" />
+                            <Button Command="{Binding StopPedometerCommand}"
+                                    HeightRequest="50"
+                                    Text="停止计步"
+                                    WidthRequest="100" />
+                            <Button Command="{Binding ResetStepCountCommand}"
+                                    HeightRequest="50"
+                                    Text="重置计数"
+                                    WidthRequest="100" />
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!--  计步器数据显示  -->
+                <Border Padding="15" BackgroundColor="LightYellow">
+                    <VerticalStackLayout Spacing="10">
+                        <Label FontAttributes="Bold" FontSize="18" Text="计步器数据" />
+                        <StackLayout>
+                            <Label Text="{Binding PedometerStatus, StringFormat='状态: {0}'}" />
+                            <Label FontAttributes="Bold" FontSize="20" Text="{Binding StepCount, StringFormat='步数: {0}'}" />
+                            <Label FontAttributes="Bold" FontSize="20" Text="{Binding StepFrequency, StringFormat='步频: {0:F1} SPM'}" />
+                        </StackLayout>
+                    </VerticalStackLayout>
+                </Border>
+            </VerticalStackLayout>
 
 
 
@@ -44,7 +93,6 @@
             <Button Grid.Column="3" Text="设置" />
         </Grid>
     </Grid>
-
 
 
 </core:BaseContentPage>

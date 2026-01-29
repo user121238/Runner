@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/Solution/">
     <File Path="Directory.Packages.props" />
+    <File Path="ReadMe.md" />
   </Folder>
   <Project Path="src/Runner.Business/Runner.Business.csproj" Id="98653d1c-cadb-45cc-94c5-d2096c0ed9e6" />
   <Project Path="src/Runner.Client/Runner.Client.csproj" Id="78828a18-7693-409e-8892-8f3f341aa42c">

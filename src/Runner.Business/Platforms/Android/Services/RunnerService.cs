@@ -33,7 +33,7 @@ namespace Runner.Business.Platforms.Android.Services
             var notification = new Notification.Builder(this, CHANNEL_ID)
                 .SetContentTitle("Runner 服务正在运行")
                 .SetContentText("点击返回应用")
-                //.SetSmallIcon(ResourceConstant.Mipmap.appicon)
+                .SetSmallIcon(global::Android.Resource.Drawable.IcMenuCompass) // 使用系统内置图标
                 .SetContentIntent(pendingIntent)
                 .SetOngoing(true)
                 .Build();

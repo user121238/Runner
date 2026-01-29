@@ -6,6 +6,8 @@ using Microsoft.Extensions.Logging;
 using Runner.Business.Platforms.Android.StepCounter;
 using Runner.Business.Platforms.Android.Media;
 using Runner.Business.Platforms.Android.Permissions;
+using Runner.Business.Platforms.Android.Location;
+using Runner.Business.Location;
 
 namespace Runner.Client.ViewModels;
 
@@ -17,11 +19,17 @@ public partial class MainViewModel : BaseViewModel
     private readonly CadencePlay _cadencePlay;
     private IStepCounter? _stepCounter;
     private bool _isPedometerActive = false;
+    private ILocationTracker? _locationTracker;
 
     // 计步器相关属性
     private int _stepCount = 0;
     private double _stepFrequency = 0.0;
     private string _pedometerStatus = "未启动";
+
+    // GPS 相关属性
+    private double _gpsDistance = 0.0;
+    private double _gpsSpeed = 0.0;
+    private string _gpsStatus = "未启动";
 
     public MainViewModel(ILogger<MainViewModel> logger, INavigationService navigation) : base(logger, navigation)
     {
@@ -32,6 +40,9 @@ public partial class MainViewModel : BaseViewModel
 
         // 初始化计步器
         InitPedometer();
+
+        // 初始化GPS追踪器
+        InitGpsTracker();
     }
 
     private void InitPedometer()
@@ -345,6 +356,245 @@ public partial class MainViewModel : BaseViewModel
             _pedometerStatus = $"切换失败: {ex.Message}";
             Logger?.LogError(ex, "切换到硬件传感器失败");
             System.Diagnostics.Debug.WriteLine($"[MainViewModel] 切换失败: {ex}");
+        }
+    }
+
+    #endregion
+
+    #region GPS 距离追踪
+
+    private void InitGpsTracker()
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine("[MainViewModel] 开始初始化GPS追踪器");
+
+            if (DeviceInfo.Current.Platform != DevicePlatform.Android)
+            {
+                _gpsStatus = "仅支持Android设备";
+                System.Diagnostics.Debug.WriteLine("[MainViewModel] 非Android平台，跳过初始化");
+                return;
+            }
+
+            // 在主线程上异步请求权限
+            MainThread.BeginInvokeOnMainThread(async () =>
+            {
+                await RequestLocationPermission();
+            });
+        }
+        catch (Exception ex)
+        {
+            _gpsStatus = $"初始化失败: {ex.Message}";
+            Logger?.LogError(ex, "初始化GPS追踪器失败");
+            System.Diagnostics.Debug.WriteLine($"[MainViewModel] GPS初始化失败: {ex}");
+        }
+    }
+
+    private async Task RequestLocationPermission()
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine("[MainViewModel] 检查位置权限");
+
+            var status = await Permissions.CheckStatusAsync<LocationPermission>();
+            System.Diagnostics.Debug.WriteLine($"[MainViewModel] 当前位置权限状态: {status}");
+
+            if (status != PermissionStatus.Granted)
+            {
+                System.Diagnostics.Debug.WriteLine("[MainViewModel] 请求位置权限");
+                status = await Permissions.RequestAsync<LocationPermission>();
+                System.Diagnostics.Debug.WriteLine($"[MainViewModel] 位置权限请求结果: {status}");
+            }
+
+            if (status == PermissionStatus.Granted)
+            {
+                System.Diagnostics.Debug.WriteLine("[MainViewModel] 位置权限已授予，创建GPS追踪器");
+                await MainThread.InvokeOnMainThreadAsync(() =>
+                {
+                    CreateLocationTracker();
+                });
+            }
+            else
+            {
+                System.Diagnostics.Debug.WriteLine($"[MainViewModel] 位置权限被拒绝: {status}");
+                await MainThread.InvokeOnMainThreadAsync(() =>
+                {
+                    _gpsStatus = "需要位置权限";
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[MainViewModel] 位置权限请求异常: {ex}");
+            await MainThread.InvokeOnMainThreadAsync(() =>
+            {
+                _gpsStatus = $"权限请求失败: {ex.Message}";
+            });
+        }
+    }
+
+    private void CreateLocationTracker()
+    {
+        try
+        {
+            System.Diagnostics.Debug.WriteLine("[MainViewModel] 创建GPS追踪器");
+            var context = Platform.CurrentActivity!;
+
+            // 使用更宽松的测试配置
+            var filterConfig = new Runner.Core.Geolocation.LocationFilterConfig
+            {
+                MinDistanceMeters = 2.0,        // 降低到2米（更敏感）
+                MaxSpeedKmPerHour = 20.0,       // 提高到20公里/小时
+                MinTimeIntervalSeconds = 0.3    // 降低到0.3秒
+            };
+
+            _locationTracker = new AndroidLocationTracker(context, filterConfig);
+
+            // 订阅事件
+            _locationTracker.OnDistanceUpdated += OnGpsDistanceUpdated;
+            _locationTracker.OnSpeedUpdated += OnGpsSpeedUpdated;
+            _locationTracker.OnError += OnGpsError;
+
+            _gpsStatus = "已就绪（测试模式）";
+            System.Diagnostics.Debug.WriteLine("[MainViewModel] GPS追踪器创建成功（测试配置）");
+        }
+        catch (Exception ex)
+        {
+            _gpsStatus = $"创建失败: {ex.Message}";
+            Logger?.LogError(ex, "创建GPS追踪器失败");
+            System.Diagnostics.Debug.WriteLine($"[MainViewModel] 创建GPS追踪器失败: {ex}");
+        }
+    }
+
+    private void OnGpsDistanceUpdated(double distanceMeters)
+    {
+        System.Diagnostics.Debug.WriteLine($"[MainViewModel] GPS距离更新: {distanceMeters:F1}米");
+
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            GpsDistance = distanceMeters / 1000.0; // 转换为公里
+            System.Diagnostics.Debug.WriteLine($"[MainViewModel] UI已更新GPS距离: {GpsDistance:F2}公里");
+        });
+    }
+
+    private void OnGpsSpeedUpdated(double speedKmh)
+    {
+        System.Diagnostics.Debug.WriteLine($"[MainViewModel] GPS速度更新: {speedKmh:F1}公里/小时");
+
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            GpsSpeed = speedKmh;
+            System.Diagnostics.Debug.WriteLine($"[MainViewModel] UI已更新GPS速度: {GpsSpeed:F1}公里/小时");
+        });
+    }
+
+    private void OnGpsError(string error)
+    {
+        System.Diagnostics.Debug.WriteLine($"[MainViewModel] GPS错误: {error}");
+
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            GpsStatus = $"错误: {error}";
+        });
+    }
+
+    public double GpsDistance
+    {
+        get => _gpsDistance;
+        private set => SetProperty(ref _gpsDistance, value);
+    }
+
+    public double GpsSpeed
+    {
+        get => _gpsSpeed;
+        private set => SetProperty(ref _gpsSpeed, value);
+    }
+
+    public string GpsStatus
+    {
+        get => _gpsStatus;
+        private set => SetProperty(ref _gpsStatus, value);
+    }
+
+    [RelayCommand]
+    private async Task StartGpsTracking()
+    {
+        System.Diagnostics.Debug.WriteLine("[MainViewModel] 开始GPS追踪命令");
+
+        if (_locationTracker == null)
+        {
+            System.Diagnostics.Debug.WriteLine("[MainViewModel] GPS追踪器未初始化");
+            GpsStatus = "追踪器未初始化";
+            return;
+        }
+
+        if (_locationTracker.IsTracking)
+        {
+            System.Diagnostics.Debug.WriteLine("[MainViewModel] GPS已在追踪中");
+            return;
+        }
+
+        try
+        {
+            await _locationTracker.StartAsync();
+            GpsStatus = "追踪中";
+            System.Diagnostics.Debug.WriteLine("[MainViewModel] GPS追踪已启动");
+        }
+        catch (Exception ex)
+        {
+            GpsStatus = $"启动失败: {ex.Message}";
+            Logger?.LogError(ex, "启动GPS追踪失败");
+            System.Diagnostics.Debug.WriteLine($"[MainViewModel] GPS启动失败: {ex}");
+        }
+    }
+
+    [RelayCommand]
+    private void StopGpsTracking()
+    {
+        System.Diagnostics.Debug.WriteLine("[MainViewModel] 停止GPS追踪命令");
+
+        if (_locationTracker == null || !_locationTracker.IsTracking)
+        {
+            System.Diagnostics.Debug.WriteLine("[MainViewModel] GPS未在追踪中");
+            return;
+        }
+
+        try
+        {
+            _locationTracker.Stop();
+            GpsStatus = "已停止";
+            System.Diagnostics.Debug.WriteLine("[MainViewModel] GPS追踪已停止");
+        }
+        catch (Exception ex)
+        {
+            GpsStatus = $"停止失败: {ex.Message}";
+            Logger?.LogError(ex, "停止GPS追踪失败");
+            System.Diagnostics.Debug.WriteLine($"[MainViewModel] GPS停止失败: {ex}");
+        }
+    }
+
+    [RelayCommand]
+    private void ResetGpsDistance()
+    {
+        System.Diagnostics.Debug.WriteLine("[MainViewModel] 重置GPS距离命令");
+
+        if (_locationTracker == null)
+        {
+            System.Diagnostics.Debug.WriteLine("[MainViewModel] GPS追踪器未初始化");
+            return;
+        }
+
+        try
+        {
+            _locationTracker.Reset();
+            GpsDistance = 0;
+            GpsSpeed = 0;
+            System.Diagnostics.Debug.WriteLine("[MainViewModel] GPS距离已重置");
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "重置GPS距离失败");
+            System.Diagnostics.Debug.WriteLine($"[MainViewModel] GPS重置失败: {ex}");
         }
     }
 

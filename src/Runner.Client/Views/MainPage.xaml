@@ -98,6 +98,39 @@
                         </HorizontalStackLayout>
                     </VerticalStackLayout>
                 </Border>
+
+                <!--  GPS 距离追踪  -->
+                <Border Padding="15" BackgroundColor="LightSkyBlue">
+                    <VerticalStackLayout Spacing="10">
+                        <Label FontAttributes="Bold" FontSize="18" Text="GPS 距离追踪" />
+                        <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
+                            <Button Command="{Binding StartGpsTrackingCommand}"
+                                    HeightRequest="50"
+                                    Text="开始追踪"
+                                    WidthRequest="100" />
+                            <Button Command="{Binding StopGpsTrackingCommand}"
+                                    HeightRequest="50"
+                                    Text="停止追踪"
+                                    WidthRequest="100" />
+                            <Button Command="{Binding ResetGpsDistanceCommand}"
+                                    HeightRequest="50"
+                                    Text="重置距离"
+                                    WidthRequest="100" />
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!--  GPS 数据显示  -->
+                <Border Padding="15" BackgroundColor="LightCyan">
+                    <VerticalStackLayout Spacing="10">
+                        <Label FontAttributes="Bold" FontSize="18" Text="GPS 数据" />
+                        <StackLayout>
+                            <Label Text="{Binding GpsStatus, StringFormat='状态: {0}'}" />
+                            <Label FontAttributes="Bold" FontSize="24" Text="{Binding GpsDistance, StringFormat='距离: {0:F2} 公里'}" />
+                            <Label FontAttributes="Bold" FontSize="20" Text="{Binding GpsSpeed, StringFormat='速度: {0:F1} 公里/小时'}" />
+                        </StackLayout>
+                    </VerticalStackLayout>
+                </Border>
             </VerticalStackLayout>
 
 

@@ -22,7 +22,7 @@
         <ApplicationTitle>Runner.Client</ApplicationTitle>
 
         <!-- App Identifier -->
-        <ApplicationId>com.companyname.runner.client</ApplicationId>
+        <ApplicationId>com.eric.runner</ApplicationId>
 
         <!-- Versions -->
         <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>

@@ -15,11 +15,11 @@
 | GPS 距离 / 速度 | 完成 | 室外已知路线、长时间锁屏、加速度兜底精度尚未实测 |
 | 节拍器 | 完成（P4 课程） | 目标步频来自课程阶段，0 = 不播；自由跑不播 |
 | 媒体控制 | 完成 | `MediaController` 发媒体键 |
-| 前台服务 | 完成（P1） | 随运动会话起停；`RunnerService.StartBeeping` 为空循环死代码，P6 删除 |
+| 前台服务 | 完成（P1） | 随运动会话起停 |
 | 2.2 阈值 / 语音 / 变调 / 震动 / 开关 | 不做（用户决定） | 步频偏离提醒已撤回；提醒改为课程节点切歌 |
-| 2.3 地图 | 未做 | 无任何实现 |
+| 2.3 地图 | 轨迹草图（P5） | 记录详情用 `GraphicsView` 画轨迹；真地图不接 |
 | 3 极简跑步主界面 | 完成（P2） | `RunView` 四个大数字 + 主按钮；底栏在 Prism 区域内切换首页 / 记录 / 设置；诊断页独立 |
-| 4 LiteDB Workouts / Activities / Settings | 部分（课程完成） | `WorkoutPlan` 走 DM `IRepository<T>`；Activities 待做；Settings 不再需要；`Product`、`User` 为框架示例遗留 |
+| 4 LiteDB Workouts / Activities / Settings | 完成（Settings 不再需要） | `WorkoutPlan`、`ActivityRecord` 走 DM `IRepository<T>` |
 | 时长 | 完成（P1） | `RunSession.Elapsed` 只累计跑动区间 |
 
 ## 设计决定
@@ -71,20 +71,23 @@
 - 界面：底栏加「课程」；课程列表（新建 / 编辑 / 删除，删除前确认）与编辑页（名称、轮数、阶段：步频、时长分钟 / 距离米、切歌开关）；首页空闲时选课程或自由跑，进行中显示「课程 · 第 r/R 轮 · 阶段 i/n · 剩 x」。
 - 真机验收：法特莱克（2 分钟 180 / 1 分钟 120 切歌 × N 轮）节点准时切节拍与切歌；暂停不计入阶段时长；距离阶段按 GPS 距离推进。
 
-#### 记录 — 未开始
+#### 记录 — 代码完成（2026-10-09），待真机验收
 
-- `Activity : BaseEntity`（StartTime、EndTime、TotalDistance、AverageCadence、TrackPoints、CadencePoints），Stop 时落盘；删除 `Product`、`User`。
-- 记录页：列表 + 详情。
+- `Runner.Core.Activities`：`ActivityRecord`（起止时间、时长、距离、步数、平均步频、均速、课程名、轨迹点、步频采样）由已结束的会话生成；短于 5 秒的会话不落盘。3 个用例。
+- `ActivityStore` 走 DM `IRepository<ActivityRecord>`；`RunSessionController.Stopped` 事件 → `RunSessionHost` 落盘并提示"记录已保存"。
+- 记录页：按时间倒序列表（日期、公里、时长、均步频、课程名），点开详情，删除前确认；详情页展示指标与轨迹草图。
+- `Product`、`User` 框架示例遗留已删除。
 
-### P5 轨迹图 — 未开始
+### P5 轨迹图 — 记录详情完成（2026-10-09）
 
-- `IMapProvider`：`StartTracking`、`DrawPath`、`UpdateUserLocation`。
-- `GraphicsView` 实现：按经纬度等距投影画折线与当前位置，用于跑步中与记录详情。
+- `TrajectoryDrawable`（`GraphicsView`）：等距投影（经度按中心纬度余弦缩放）后按比例铺满画布画折线，起点白、终点红，无轨迹时提示。
+- 只用于记录详情；跑步中主界面保持四个数字，不加图。
+- 没有引入 `IMapProvider` 抽象：只有一个实现时接口是空壳，真要接 SDK 时再抽。
 
-### P6 真机验收与清理 — 未开始
+### P6 真机验收与清理 — 清理完成（2026-10-09），真机验收待做
 
-- 室外已知长度路线多次往返、锁屏长跑、加速度兜底精度。
-- 删除 `RunnerService.StartBeeping`；处理过期文档（见下）。
+- 已清理：删除 `RunnerService.StartBeeping` 死代码、`Product` / `User` 示例模型、过期文档（见下）；csproj `ApplicationId` 对齐为 Manifest 的 `com.eric.runner`。
+- 待真机验收（手机解锁后）：P1–P5 各项界面截图；室外已知长度路线多次往返、锁屏长跑、加速度兜底精度；法特莱克课程节点切节拍与切歌；记录落盘与轨迹草图。
 
 ## 冻结范围：手表蓝牙
 
@@ -92,4 +95,4 @@
 
 ## 过期文档
 
-`GPS_DISTANCE_TRACKING.md`、`GPS_FILTER_DEBUG_GUIDE.md`、`MAINPAGE_GPS_EXAMPLE.md` 记录的 5m / 15km/h / 0.5s 为旧参数，当前默认值见 `ALGORITHM_VALIDATION.md`；`DEMO_README.md` 为框架示例说明；根目录 `Runner.md` 与 `doc/Runner.md` 内容相同。P6 统一处理。
+已于 P6 删除：`GPS_DISTANCE_TRACKING.md`、`GPS_FILTER_DEBUG_GUIDE.md`、`MAINPAGE_GPS_EXAMPLE.md`（记录的 5m / 15km/h / 0.5s 为旧参数，当前默认值见 `ALGORITHM_VALIDATION.md`）、`DEMO_README.md`（框架示例说明）、根目录 `Runner.md`（与 `doc/Runner.md` 重复）。`ARCHITECTURE_REFACTORING.md`、`REFACTORING_SUMMARY.md` 作为历史记录保留。

@@ -55,18 +55,6 @@ namespace Runner.Business.Platforms.Android.Services
             notificationManager?.CreateNotificationChannel(channel);
         }
 
-        public async Task StartBeeping(int spm)
-        {
-            double interval = 60000.0 / spm;
-
-            using (var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(interval)))
-            {
-                while (await timer.WaitForNextTickAsync())
-                {
-
-                }
-            }
-        }
 
 
     }

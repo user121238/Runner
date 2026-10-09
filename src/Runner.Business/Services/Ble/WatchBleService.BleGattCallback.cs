@@ -57,7 +57,6 @@ public partial class WatchBleService
 
         public override void OnMtuChanged(BluetoothGatt? gatt, int mtu, GattStatus status)
         {
-            _service._mtuTcs?.TrySetResult(true);
             _service.Log($"MTU changed: {mtu}");
             _service._gatt?.DiscoverServices();
         }

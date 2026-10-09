@@ -1,5 +1,4 @@
 ﻿using Android.Bluetooth.LE;
-using Runner.Business.Models.WatchBle;
 
 namespace Runner.Business.Services.Ble;
 
@@ -12,14 +11,8 @@ public partial class WatchBleService
 
         public override void OnScanResult(ScanCallbackType callbackType, ScanResult? result)
         {
-            if (result?.Device?.Name?.Contains(WatchConstants.WATCH_NAME_PREFIX, StringComparison.OrdinalIgnoreCase) == true)
-            {
-                var name = result.Device.Name;
-                var addr = result.Device.Address;
-                _service.Log($"Found: {name} [{addr}]");
-                _service.OnDeviceFound?.Invoke(addr);
+            if (_service.TryReportDevice(result?.Device, "Found"))
                 _service._scanCts?.Cancel();
-            }
         }
 
         public override void OnScanFailed(ScanFailure errorCode)

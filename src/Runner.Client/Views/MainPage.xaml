@@ -1,195 +1,42 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<core:BaseContentPage x:Class="Runner.Client.Views.MainPage"
-                      xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-                      xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-                      xmlns:core="clr-namespace:DM.Maui.Framework.Core.Mvvm;assembly=DM.Maui.Framework.Core"
-                      xmlns:vm="clr-namespace:Runner.Client.ViewModels"
-                      Title="{Binding Title}"
-                      x:DataType="vm:MainViewModel">
+<ContentPage x:Class="Runner.Client.Views.MainPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:regions="clr-namespace:Prism.Navigation.Regions.Xaml;assembly=Prism.Maui"
+             xmlns:vm="clr-namespace:Runner.Client.ViewModels"
+             x:DataType="vm:MainPageViewModel"
+             BackgroundColor="Black"
+             NavigationPage.HasNavigationBar="False">
 
-    <Grid RowDefinitions="*,50">
-        <ScrollView>
+    <Grid RowDefinitions="*,64">
+        <!--  首页 / 记录 / 设置 在此区域内切换  -->
+        <ContentView regions:RegionManager.RegionName="MainRegion" />
 
-            <VerticalStackLayout Padding="20" Spacing="15" VerticalOptions="Start">
-                <!--  运动会话  -->
-                <Border Padding="15" BackgroundColor="#1E1E1E">
-                    <VerticalStackLayout Spacing="8">
-                        <Label FontAttributes="Bold" FontSize="18" Text="运动会话" TextColor="White" />
-                        <Label Text="{Binding SessionStatus, StringFormat='状态: {0}'}" TextColor="White" />
-                        <Label FontSize="13" Text="{Binding SessionMessage}" TextColor="Orange" />
-                        <Label FontAttributes="Bold" FontSize="40" Text="{Binding SessionElapsed}" TextColor="White" />
-                        <Label FontAttributes="Bold" FontSize="28" Text="{Binding SessionDistanceKm, StringFormat='{}{0:F3} 公里'}" TextColor="White" />
-                        <Label FontAttributes="Bold"
-                               FontSize="28"
-                               IsVisible="{Binding CadenceAvailable}"
-                               Text="{Binding SessionCadence, StringFormat='{}{0:F0} SPM'}"
-                               TextColor="White" />
-                        <Label FontSize="16" Text="{Binding SessionTargetCadence, StringFormat='目标 {0} SPM'}" TextColor="LightGray" />
-                        <Label FontSize="13" Text="{Binding SessionSummary}" TextColor="LightGray" />
-                        <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
-                            <Button Command="{Binding StartSessionCommand}"
-                                    HeightRequest="50"
-                                    Text="开始"
-                                    WidthRequest="75" />
-                            <Button Command="{Binding PauseSessionCommand}"
-                                    HeightRequest="50"
-                                    Text="暂停"
-                                    WidthRequest="75" />
-                            <Button Command="{Binding ResumeSessionCommand}"
-                                    HeightRequest="50"
-                                    Text="继续"
-                                    WidthRequest="75" />
-                            <Button Command="{Binding StopSessionCommand}"
-                                    HeightRequest="50"
-                                    Text="结束"
-                                    WidthRequest="75" />
-                        </HorizontalStackLayout>
-                    </VerticalStackLayout>
-                </Border>
-
-                <!--  媒体控制按钮  -->
-                <Frame Padding="15" BackgroundColor="LightGray">
-                    <VerticalStackLayout Spacing="10">
-                        <Label FontAttributes="Bold" FontSize="18" Text="媒体控制" />
-                        <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
-                            <Button Command="{Binding PreviousTrackCommand}"
-                                    HeightRequest="50"
-                                    Text="上一首"
-                                    WidthRequest="100" />
-                            <Button Command="{Binding PlayPauseCommand}"
-                                    HeightRequest="50"
-                                    Text="播放/暂停"
-                                    WidthRequest="100" />
-                            <Button Command="{Binding NextTrackCommand}"
-                                    HeightRequest="50"
-                                    Text="下一首"
-                                    WidthRequest="100" />
-                        </HorizontalStackLayout>
-                    </VerticalStackLayout>
-                </Frame>
-
-                <!--  节拍器控制按钮  -->
-                <Frame Padding="15" BackgroundColor="LightBlue">
-                    <VerticalStackLayout Spacing="10">
-                        <Label FontAttributes="Bold" FontSize="18" Text="节拍器控制" />
-                        <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
-                            <Button Command="{Binding StartTickCommand}"
-                                    HeightRequest="50"
-                                    Text="开始节拍"
-                                    WidthRequest="120" />
-                            <Button Command="{Binding StopTickCommand}"
-                                    HeightRequest="50"
-                                    Text="停止节拍"
-                                    WidthRequest="120" />
-                        </HorizontalStackLayout>
-                    </VerticalStackLayout>
-                </Frame>
-
-                <!--  计步器控制按钮  -->
-                <Border Padding="15" BackgroundColor="LightGreen">
-                    <VerticalStackLayout Spacing="10">
-                        <Label FontAttributes="Bold" FontSize="18" Text="计步器控制" />
-                        <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
-                            <Button Command="{Binding StartPedometerCommand}"
-                                    HeightRequest="50"
-                                    Text="开始计步"
-                                    WidthRequest="100" />
-                            <Button Command="{Binding StopPedometerCommand}"
-                                    HeightRequest="50"
-                                    Text="停止计步"
-                                    WidthRequest="100" />
-                            <Button Command="{Binding ResetStepCountCommand}"
-                                    HeightRequest="50"
-                                    Text="重置计数"
-                                    WidthRequest="100" />
-                        </HorizontalStackLayout>
-                    </VerticalStackLayout>
-                </Border>
-
-                <!--  计步器数据显示  -->
-                <Border Padding="15" BackgroundColor="LightYellow">
-                    <VerticalStackLayout Spacing="10">
-                        <Label FontAttributes="Bold" FontSize="18" Text="计步器数据" />
-                        <StackLayout>
-                            <Label Text="{Binding PedometerStatus, StringFormat='状态: {0}'}" />
-                            <Label FontAttributes="Bold" FontSize="20" Text="{Binding StepCount, StringFormat='步数: {0}'}" />
-                            <Label FontAttributes="Bold" FontSize="20" Text="{Binding StepFrequency, StringFormat='步频: {0:F1} SPM'}" />
-                        </StackLayout>
-                    </VerticalStackLayout>
-                </Border>
-
-                <!--  传感器切换  -->
-                <Border Padding="15" BackgroundColor="LightCoral">
-                    <VerticalStackLayout Spacing="10">
-                        <Label FontAttributes="Bold" FontSize="18" Text="传感器切换" />
-                        <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
-                            <Button Command="{Binding SwitchToHardwareCommand}"
-                                    HeightRequest="50"
-                                    Text="硬件传感器"
-                                    WidthRequest="120" />
-                            <Button Command="{Binding SwitchToAccelerometerCommand}"
-                                    HeightRequest="50"
-                                    Text="加速度传感器"
-                                    WidthRequest="120" />
-                        </HorizontalStackLayout>
-                    </VerticalStackLayout>
-                </Border>
-
-                <!--  GPS 距离追踪  -->
-                <Border Padding="15" BackgroundColor="LightSkyBlue">
-                    <VerticalStackLayout Spacing="10">
-                        <Label FontAttributes="Bold" FontSize="18" Text="GPS 距离追踪" />
-                        <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
-                            <Button Command="{Binding StartGpsTrackingCommand}"
-                                    HeightRequest="50"
-                                    Text="开始追踪"
-                                    WidthRequest="100" />
-                            <Button Command="{Binding StopGpsTrackingCommand}"
-                                    HeightRequest="50"
-                                    Text="停止追踪"
-                                    WidthRequest="100" />
-                            <Button Command="{Binding ResetGpsDistanceCommand}"
-                                    HeightRequest="50"
-                                    Text="重置距离"
-                                    WidthRequest="100" />
-                        </HorizontalStackLayout>
-                    </VerticalStackLayout>
-                </Border>
-
-                <!--  GPS 数据显示  -->
-                <Border Padding="15" BackgroundColor="LightCyan">
-                    <VerticalStackLayout Spacing="10">
-                        <Label FontAttributes="Bold" FontSize="18" Text="GPS 数据" />
-                        <StackLayout>
-                            <Label Text="{Binding GpsStatus, StringFormat='状态: {0}'}" />
-                            <Label FontAttributes="Bold" FontSize="24" Text="{Binding GpsDistance, StringFormat='距离: {0:F3} 公里'}" />
-                            <Label FontAttributes="Bold" FontSize="20" Text="{Binding GpsSpeed, StringFormat='速度: {0:F1} 公里/小时'}" />
-                        </StackLayout>
-                    </VerticalStackLayout>
-                </Border>
-                <!--  手表跑步  -->
-                <Border Padding="15" BackgroundColor="#FFE4E1">
-                    <VerticalStackLayout Spacing="10">
-                        <Label FontAttributes="Bold" FontSize="18" Text="手表跑步" />
-                        <Button Command="{Binding GoToWatchWorkoutCommand}"
-                                HeightRequest="50"
-                                Text="连接手表跑步"
-                                WidthRequest="200" />
-                    </VerticalStackLayout>
-                </Border>
-
-            </VerticalStackLayout>
-
-
-
-        </ScrollView>
-        <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*">
-            <Button Text="首页" />
-            <Button Grid.Column="1" Text="计划" />
-            <Button Grid.Column="2" Text="记录" />
-            <Button Grid.Column="3" Text="设置" />
+        <Grid Grid.Row="1" BackgroundColor="#111111" ColumnDefinitions="*,*,*">
+            <Button BackgroundColor="Transparent"
+                    Command="{Binding NavigateCommand}"
+                    CommandParameter="RunView"
+                    CornerRadius="0"
+                    FontSize="16"
+                    Text="首页"
+                    TextColor="White" />
+            <Button Grid.Column="1"
+                    BackgroundColor="Transparent"
+                    Command="{Binding NavigateCommand}"
+                    CommandParameter="HistoryView"
+                    CornerRadius="0"
+                    FontSize="16"
+                    Text="记录"
+                    TextColor="White" />
+            <Button Grid.Column="2"
+                    BackgroundColor="Transparent"
+                    Command="{Binding NavigateCommand}"
+                    CommandParameter="SettingsView"
+                    CornerRadius="0"
+                    FontSize="16"
+                    Text="设置"
+                    TextColor="White" />
         </Grid>
     </Grid>
 
-
-</core:BaseContentPage>
+</ContentPage>

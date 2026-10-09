@@ -1,7 +1,8 @@
-﻿using DM.Maui.Framework.Core.Extensions;
+﻿using _Microsoft.Android.Resource.Designer;
 using DM.Maui.Framework.Data.Extensions;
 using Microsoft.Extensions.Logging;
-using System.Globalization;
+using Prism.Ioc;
+using Runner.Business.Platforms.Android.Session;
 using Runner.Business.Services.Ble;
 using Runner.Business.Services.Database;
 using Runner.Client.ViewModels;
@@ -13,7 +14,6 @@ namespace Runner.Client
     {
         public static MauiApp CreateMauiApp()
         {
-
             var builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()
@@ -21,31 +21,37 @@ namespace Runner.Client
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
                     fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
-                });
+                })
+                .UsePrism(prism => prism
+                    .RegisterTypes(registry =>
+                    {
+                        // 页面：根页承载区域；需要独立一屏的用 ContentPage 跳转
+                        registry.RegisterForNavigation<MainPage, MainPageViewModel>();
+                        registry.RegisterForNavigation<DiagnosticsPage, DiagnosticsPageViewModel>();
 
-            // 注册框架核心服务
-            builder.Services.AddMauiCore(sp=>{});
+                        // 区域视图：首页 / 记录 / 设置在 MainRegion 内切换
+                        registry.RegisterForRegionNavigation<RunView, RunViewModel>();
+                        registry.RegisterForRegionNavigation<HistoryView, HistoryViewModel>();
+                        registry.RegisterForRegionNavigation<SettingsView, SettingsViewModel>();
+                    })
+                    .CreateWindow("NavigationPage/MainPage"));
 
-            // 注册数据库服务
+            // 数据库（P4 记录与设置使用）
             var dbPath = Path.Combine(FileSystem.AppDataDirectory, "runner.db");
             builder.Services.AddLiteDbDataAccess(dbPath);
 
-            // 注册 BLE 服务
+            // 运动会话宿主：应用级单例，持有 GPS / 计步 / 节拍器
+            builder.Services.AddSingleton(sp =>
+                new RunSessionHost(ResourceConstant.Raw.beep3, sp.GetRequiredService<ILogger<RunSessionHost>>()));
+
+            // 手表线（冻结）：注册保留，界面入口已移除
             builder.Services.AddSingleton<IWatchBleService, WatchBleService>();
-
-            // 注册 MiHealth 数据库读取器
             builder.Services.AddSingleton<MiHealthDataReader>();
-
-            // 注册 ViewModel 和页面
             builder.Services.AddTransient<WatchWorkoutViewModel>();
             builder.Services.AddTransient<WatchWorkoutPage>();
 
-            // 注册路由
-            builder.Services.AddNavigationRoutes(typeof(MainPage).Assembly);
-
-
 #if DEBUG
-    		builder.Logging.AddDebug();
+            builder.Logging.AddDebug();
             builder.Logging.SetMinimumLevel(LogLevel.Debug);
 #endif
 

@@ -11,8 +11,11 @@
 		<PackageVersion Include="coverlet.collector" Version="10.1.0" />
 		<PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.1" />
 		<PackageVersion Include="Microsoft.Maui.Controls" Version="10.0.20" />
+		<PackageVersion Include="Microsoft.Maui.Controls.Compatibility" Version="10.0.20" />
 		<PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
 		<PackageVersion Include="LiteDB" Version="5.0.21" />
+		<PackageVersion Include="Prism.Maui" Version="9.0.537" />
+		<PackageVersion Include="Prism.DryIoc.Maui" Version="9.0.537" />
 
 
 		<!--框架	-->

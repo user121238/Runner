@@ -38,7 +38,7 @@ public partial class WatchWorkoutViewModel : BaseViewModel
 
     private readonly List<WatchSportInfo> _receivedData = new();
 
-    public WatchWorkoutViewModel(ILogger<WatchWorkoutViewModel> logger, INavigationService navigation)
+    public WatchWorkoutViewModel(ILogger<WatchWorkoutViewModel> logger, DM.Maui.Framework.Abstractions.Navigation.INavigationService navigation)
         : base(logger, navigation)
     {
         _bleService = App.Current?.Handler?.MauiContext?.Services.GetService<IWatchBleService>()

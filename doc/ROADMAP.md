@@ -18,7 +18,7 @@
 | 前台服务 | 完成（P1） | 随运动会话起停；`RunnerService.StartBeeping` 为空循环死代码，P6 删除 |
 | 2.2 阈值 / 语音 / 变调 / 震动 / 开关 | 未做 | 无任何实现 |
 | 2.3 地图 | 未做 | 无任何实现 |
-| 3 极简跑步主界面 | 未做 | `MainPage` 为调试面板；底栏四个按钮未绑命令；`AppShell` 空壳 |
+| 3 极简跑步主界面 | 完成（P2） | `RunView` 四个大数字 + 主按钮；底栏在 Prism 区域内切换首页 / 记录 / 设置；诊断页独立 |
 | 4 LiteDB Workouts / Activities / Settings | 未做 | 仅注册了 `AddLiteDbDataAccess`，无实体；`Product`、`User` 为框架示例遗留 |
 | 时长 | 完成（P1） | `RunSession.Elapsed` 只累计跑动区间 |
 
@@ -27,6 +27,7 @@
 - 核心数据结构是运动会话 `RunSession`：状态机 Idle / Running / Paused / Stopped，时长、距离、实时步频、目标步频、轨迹点、步频采样。Activity 记录是会话落盘，Workout 是会话的阶段计划，提醒是会话内实际步频对目标步频的判定。
 - 一个 Start / Pause / Stop 驱动 GPS、计步、节拍器、前台服务；前台服务随会话起停。
 - 可测逻辑放 `Runner.Core`（会话状态机、提醒判定、阶段推进），Android 绑定放 `Runner.Business`，与现有分层一致，直接进现有 MSTest 项目。
+- Client 导航用 Prism.Maui（9.0.537 + Prism.DryIoc.Maui）：根页以 `RegionManager` 区域承载 `ContentView` 切换，需要独立一屏的用 `INavigationService` 推 `ContentPage`，根为 `NavigationPage/MainPage`。VM 继承 `BindableBase`，命令用 CommunityToolkit `[RelayCommand]`。
 - 持久化复用 `DM.Maui.Framework.Data` 的 `IRepository<T>`、`IUnitOfWork`、`BaseEntity`、`LiteDbRepository<T>`，不自写 LiteDB 层。
 - 地图 v1 用 `GraphicsView` 画轨迹折线：离线、零依赖；保留 `IMapProvider` 作为将来接 SDK 的切换点。真地图目前没有免费可用渠道，不接。
 - 现有调试页保留为设置中的"诊断"入口，不删。
@@ -46,11 +47,14 @@
 - 主页新增"运动会话"面板作为 P2 之前的临时入口，原诊断面板保留。
 - 待真机验收：锁屏 10 分钟时长 / 距离 / 步数连续；暂停期间三者不累计；GPS 未开启时会话只剩节拍与计步并提示。
 
-### P2 极简主界面 — 未开始
+### P2 极简主界面 — 代码完成（2026-10-09），待真机截图验收
 
-- 新主页：时长、距离、实际步频、目标步频四个大数字，一个大按钮，深色高对比。
-- `AppShell` 三个 Tab：首页、记录、设置（计划页在 P4 加）。
-- 调试页挂到设置中的"诊断"；主页去掉"连接手表跑步"入口。
+- 导航骨架换成 Prism.Maui：根页 `MainPage` 以 `MainRegion` 承载首页 `RunView` / 记录 `HistoryView` / 设置 `SettingsView` 三个 `ContentView`，底栏 `RequestNavigate` 切换；诊断页 `DiagnosticsPage` 为独立 `ContentPage`，从设置页推入。`AppShell` 删除。
+- 首页：时长 / 距离 / 实际步频 / 目标步频四个大数字 + 一个主按钮（开始 / 暂停 / 继续）+ 进行中才出现的结束键，黑底白字；无计步来源时步频显示"—"。
+- `RunSessionHost`（Business）成为应用级单例：权限申请、GPS / 计步 / 节拍器来源与会话控制器的唯一所有者，首页与诊断页都只消费它，不各自建监听器。
+- 记录页为占位（P4 填充）；设置页只有"诊断"入口（P3 填充）；"连接手表跑步"入口移除。
+- DM.Maui.Framework.Core 的 Shell / 导航只为冻结的手表页面保留编译；DM.Data 继续用。
+- 真机：Debug 包已安装并启动无崩溃（包名实际为 Manifest 的 `com.eric.runner`，非 csproj 的 ApplicationId）；当时手机锁屏且 MIUI 拒绝 adb 注入按键，界面截图待解锁后补。
 
 ### P3 设置与提醒 — 未开始
 

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView x:Class="Runner.Client.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:Runner.Client.ViewModels"
+             x:DataType="vm:SettingsViewModel"
+             BackgroundColor="Black">
+
+    <VerticalStackLayout Padding="24,40,24,24" Spacing="16">
+        <Label FontSize="22" Text="设置" TextColor="White" />
+        <Label FontSize="14" Text="目标步频、提醒阈值与开关将在后续版本加入。" TextColor="#9E9E9E" />
+
+        <Button BackgroundColor="#222222"
+                Command="{Binding OpenDiagnosticsCommand}"
+                CornerRadius="8"
+                FontSize="18"
+                HeightRequest="56"
+                Text="诊断"
+                TextColor="White" />
+    </VerticalStackLayout>
+
+</ContentView>

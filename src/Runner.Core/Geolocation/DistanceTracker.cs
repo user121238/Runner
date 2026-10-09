@@ -1,131 +1,128 @@
-namespace Runner.Core.Geolocation
+namespace Runner.Core.Geolocation;
+
+/// <summary>按连续录制段累计距离；有效观测、距离锚点和速度时效分别维护。</summary>
+public class DistanceTracker
 {
-    /// <summary>
-    /// 距离追踪器 - 累加轨迹距离
-    /// </summary>
-    public class DistanceTracker
+    private readonly LocationFilterConfig _config;
+    private readonly LocationFilter _filter;
+    private readonly TimeProvider _timeProvider;
+    private readonly object _lock = new();
+    private readonly List<GeoCoordinate> _trajectory = new();
+    private GeoCoordinate? _lastDistancePoint;
+    private GeoCoordinate? _lastObservation;
+    private double _totalDistance;
+    private double _recordedSeconds;
+    private double _currentSpeed;
+
+    public DistanceTracker(LocationFilterConfig? filterConfig = null, TimeProvider? timeProvider = null)
     {
-        private readonly LocationFilter _filter;
-        private readonly List<GeoCoordinate> _trajectory = new();
-        private double _totalDistance = 0;
+        _config = (filterConfig ?? new()).Snapshot();
+        _filter = new LocationFilter(_config);
+        _timeProvider = timeProvider ?? TimeProvider.System;
+    }
 
-        /// <summary>
-        /// 总距离（米）
-        /// </summary>
-        public double TotalDistanceMeters => _totalDistance;
+    public double TotalDistanceMeters { get { lock (_lock) return _totalDistance; } }
+    public double TotalDistanceKm => TotalDistanceMeters / 1000;
+    public int TrajectoryPointCount { get { lock (_lock) return _trajectory.Count; } }
+    // 真正的快照：调用方枚举时不受传感器回调修改影响。
+    public IReadOnlyList<GeoCoordinate> Trajectory { get { lock (_lock) return _trajectory.ToArray(); } }
 
-        /// <summary>
-        /// 总距离（公里）
-        /// </summary>
-        public double TotalDistanceKm => _totalDistance / 1000.0;
+    public bool AddLocation(GeoCoordinate location) => AddLocation(location, out _);
 
-        /// <summary>
-        /// 轨迹点数量
-        /// </summary>
-        public int TrajectoryPointCount => _trajectory.Count;
-
-        /// <summary>
-        /// 获取轨迹副本
-        /// </summary>
-        public IReadOnlyList<GeoCoordinate> Trajectory => _trajectory.AsReadOnly();
-
-        public DistanceTracker(LocationFilterConfig? filterConfig = null)
+    public bool AddLocation(GeoCoordinate location, out FilterResult filterResult)
+    {
+        lock (_lock)
         {
-            _filter = new LocationFilter(filterConfig);
-        }
-
-        /// <summary>
-        /// 添加位置点
-        /// </summary>
-        /// <param name="location">新的位置点</param>
-        /// <returns>是否接受此位置点</returns>
-        public bool AddLocation(GeoCoordinate location)
-        {
-            return AddLocation(location, out _);
-        }
-
-        /// <summary>
-        /// 添加位置点（带过滤结果）
-        /// </summary>
-        /// <param name="location">新的位置点</param>
-        /// <param name="filterResult">过滤结果</param>
-        /// <returns>是否接受此位置点</returns>
-        public bool AddLocation(GeoCoordinate location, out FilterResult filterResult)
-        {
-            filterResult = _filter.Filter(location);
-
-            if (filterResult == FilterResult.Accept)
+            double age = (_timeProvider.GetUtcNow() - location.Timestamp).TotalSeconds;
+            if (age < 0)
             {
-                // 如果不是第一个点，计算距离并累加
-                if (_trajectory.Count > 0)
-                {
-                    var lastLocation = _trajectory[^1];
-                    double distance = GeoCalculator.CalculateDistance(lastLocation, location);
-                    _totalDistance += distance;
-                }
-
-                _trajectory.Add(location);
-                return true;
+                filterResult = FilterResult.RejectFutureLocation;
+                return false;
+            }
+            if (age > _config.MaxLocationAgeSeconds)
+            {
+                filterResult = FilterResult.RejectStaleLocation;
+                return false;
             }
 
-            return false;
+            filterResult = _filter.Filter(location);
+            if (filterResult != FilterResult.Accept && filterResult != FilterResult.RejectDistanceTooSmall)
+                return false;
+
+            UpdateObservation(location);
+            double calculatedSpeed = 0;
+            if (filterResult == FilterResult.Accept)
+            {
+                if (_lastDistancePoint is GeoCoordinate last)
+                {
+                    double distance = GeoCalculator.CalculateDistance(last, location);
+                    _totalDistance += distance;
+                    calculatedSpeed = distance / (location.Timestamp - last.Timestamp).TotalSeconds;
+                }
+                _lastDistancePoint = location;
+                _trajectory.Add(location);
+            }
+
+            double? nativeSpeed = location.SpeedMetersPerSecond;
+            _currentSpeed = nativeSpeed is double speed && double.IsFinite(speed) &&
+                speed >= 0 && speed * 3.6 <= _config.MaxSpeedKmPerHour ? speed : calculatedSpeed;
+            return filterResult == FilterResult.Accept;
         }
+    }
 
-        /// <summary>
-        /// 获取当前速度（基于最后两个点）
-        /// </summary>
-        /// <returns>速度（米/秒），如果点数不足返回0</returns>
-        public double GetCurrentSpeedMps()
+    private void UpdateObservation(GeoCoordinate location)
+    {
+        if (_lastObservation is GeoCoordinate last)
         {
-            if (_trajectory.Count < 2)
-                return 0;
-
-            var last = _trajectory[^1];
-            var secondLast = _trajectory[^2];
-
-            return GeoCalculator.CalculateSpeed(secondLast, last);
+            double elapsed = (location.Timestamp - last.Timestamp).TotalSeconds;
+            if (elapsed > _config.MaxGapSeconds)
+                _lastDistancePoint = null;
+            else
+                _recordedSeconds += elapsed;
         }
+        _lastObservation = location;
+    }
 
-        /// <summary>
-        /// 获取当前速度（公里/小时）
-        /// </summary>
-        public double GetCurrentSpeedKmh()
+    public double GetCurrentSpeedMps()
+    {
+        lock (_lock)
         {
-            return GeoCalculator.MetersPerSecondToKmPerHour(GetCurrentSpeedMps());
+            if (_lastObservation is not GeoCoordinate last) return 0;
+            double age = (_timeProvider.GetUtcNow() - last.Timestamp).TotalSeconds;
+            return age < 0 || age >= _config.SpeedTimeoutSeconds ? 0 : _currentSpeed;
         }
+    }
 
-        /// <summary>
-        /// 获取平均速度（米/秒）
-        /// </summary>
-        public double GetAverageSpeedMps()
+    public double GetCurrentSpeedKmh() => GeoCalculator.MetersPerSecondToKmPerHour(GetCurrentSpeedMps());
+
+    /// <summary>平均速度包含段内静止时间，不包含显式暂停及长时间失去定位的段间空白。</summary>
+    public double GetAverageSpeedMps()
+    {
+        lock (_lock) return _recordedSeconds > 0 ? _totalDistance / _recordedSeconds : 0;
+    }
+
+    public double GetAverageSpeedKmh() => GeoCalculator.MetersPerSecondToKmPerHour(GetAverageSpeedMps());
+
+    /// <summary>暂停/恢复时断开轨迹，保留已录制的距离和时间。</summary>
+    public void BeginSegment()
+    {
+        lock (_lock)
         {
-            if (_trajectory.Count < 2)
-                return 0;
-
-            var totalTime = (_trajectory[^1].Timestamp - _trajectory[0].Timestamp).TotalSeconds;
-
-            if (totalTime <= 0)
-                return 0;
-
-            return _totalDistance / totalTime;
+            _filter.Reset();
+            _lastDistancePoint = null;
+            _lastObservation = null;
+            _currentSpeed = 0;
         }
+    }
 
-        /// <summary>
-        /// 获取平均速度（公里/小时）
-        /// </summary>
-        public double GetAverageSpeedKmh()
+    public void Reset()
+    {
+        lock (_lock)
         {
-            return GeoCalculator.MetersPerSecondToKmPerHour(GetAverageSpeedMps());
-        }
-
-        /// <summary>
-        /// 重置追踪器
-        /// </summary>
-        public void Reset()
-        {
+            BeginSegment();
             _trajectory.Clear();
             _totalDistance = 0;
-            _filter.Reset();
+            _recordedSeconds = 0;
         }
     }
 }

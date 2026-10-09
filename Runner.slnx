@@ -8,4 +8,5 @@
     <Deploy Solution="Debug|*" />
   </Project>
   <Project Path="src/Runner.Core/Runner.Core.csproj" Id="c2bff298-5eb6-4650-b355-91788a5e5656" />
+  <Project Path="tests/Runner.Core.Tests/Runner.Core.Tests.csproj" />
 </Solution>

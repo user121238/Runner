@@ -31,5 +31,8 @@ namespace Runner.Business.Platforms.Android.StepCounter
         /// 停止计步
         /// </summary>
         void Stop();
+
+        /// <summary>重置本次运动步数及步频，不改变启动状态。</summary>
+        void Reset();
     }
 }

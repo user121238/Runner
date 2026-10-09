@@ -1,123 +1,60 @@
-namespace Runner.Core.Geolocation
+﻿namespace Runner.Core.Geolocation;
+
+/// <summary>
+/// 距离使用不重叠的定位误差圈作为移动门限。精度是估计值，而非严格误差上界；
+/// 缺少精度时保留最小距离门限，不能声称能区分所有静止漂移和真实移动。
+/// </summary>
+public class LocationFilter
 {
-    /// <summary>
-    /// 位置过滤器配置
-    /// </summary>
-    public class LocationFilterConfig
+    private readonly LocationFilterConfig _config;
+    private GeoCoordinate? _lastAcceptedLocation;
+    private DateTimeOffset? _lastObservationTime;
+
+    public LocationFilter(LocationFilterConfig? config = null)
     {
-        /// <summary>
-        /// 最小距离阈值（米）- 小于此值的跳变将被忽略
-        /// </summary>
-        public double MinDistanceMeters { get; set; } = 5.0;
-
-        /// <summary>
-        /// 最大速度限制（公里/小时）- 超过此速度的点将被忽略
-        /// </summary>
-        public double MaxSpeedKmPerHour { get; set; } = 15.0;
-
-        /// <summary>
-        /// 最小时间间隔（秒）- 两个点之间的最小时间间隔
-        /// </summary>
-        public double MinTimeIntervalSeconds { get; set; } = 0.5;
+        _config = (config ?? new()).Snapshot();
     }
 
-    /// <summary>
-    /// 位置过滤结果
-    /// </summary>
-    public enum FilterResult
+    public GeoCoordinate? LastAcceptedLocation => _lastAcceptedLocation;
+
+    public FilterResult Filter(GeoCoordinate location)
     {
-        /// <summary>
-        /// 接受此位置
-        /// </summary>
-        Accept,
+        if (!location.IsValid) return FilterResult.RejectInvalidCoordinate;
+        if (location.HorizontalAccuracyMeters > _config.MaxAccuracyMeters)
+            return FilterResult.RejectAccuracyTooPoor;
 
-        /// <summary>
-        /// 拒绝 - 距离太小
-        /// </summary>
-        RejectDistanceTooSmall,
+        double interval = _lastObservationTime is DateTimeOffset lastTime
+            ? (location.Timestamp - lastTime).TotalSeconds : double.PositiveInfinity;
+        if (interval <= 0 || interval < _config.MinTimeIntervalSeconds)
+            return FilterResult.RejectTimeIntervalTooShort;
 
-        /// <summary>
-        /// 拒绝 - 速度太快
-        /// </summary>
-        RejectSpeedTooFast,
+        if (_lastAcceptedLocation is not GeoCoordinate last || interval > _config.MaxGapSeconds)
+            return Accept(location);
 
-        /// <summary>
-        /// 拒绝 - 时间间隔太短
-        /// </summary>
-        RejectTimeIntervalTooShort
+        double distance = GeoCalculator.CalculateDistance(last, location);
+        double elapsed = (location.Timestamp - last.Timestamp).TotalSeconds;
+        if (distance / elapsed * 3.6 > _config.MaxSpeedKmPerHour)
+            return FilterResult.RejectSpeedTooFast;
+
+        double uncertainty = (last.HorizontalAccuracyMeters ?? 0) + (location.HorizontalAccuracyMeters ?? 0);
+        double threshold = Math.Max(_config.MinDistanceMeters, uncertainty);
+        _lastObservationTime = location.Timestamp;
+        if (distance == 0 || distance < threshold)
+            return FilterResult.RejectDistanceTooSmall;
+
+        return Accept(location);
     }
 
-    /// <summary>
-    /// 位置过滤器 - 过滤GPS跳变和异常速度
-    /// </summary>
-    public class LocationFilter
+    private FilterResult Accept(GeoCoordinate location)
     {
-        private readonly LocationFilterConfig _config;
-        private GeoCoordinate? _lastAcceptedLocation;
+        _lastAcceptedLocation = location;
+        _lastObservationTime = location.Timestamp;
+        return FilterResult.Accept;
+    }
 
-        public LocationFilter(LocationFilterConfig? config = null)
-        {
-            _config = config ?? new LocationFilterConfig();
-        }
-
-        /// <summary>
-        /// 过滤位置点
-        /// </summary>
-        /// <param name="location">新的位置点</param>
-        /// <returns>过滤结果</returns>
-        public FilterResult Filter(GeoCoordinate location)
-        {
-            // 第一个点总是接受
-            if (_lastAcceptedLocation == null)
-            {
-                _lastAcceptedLocation = location;
-                return FilterResult.Accept;
-            }
-
-            var lastLocation = _lastAcceptedLocation.Value;
-
-            // 检查时间间隔
-            double timeInterval = (location.Timestamp - lastLocation.Timestamp).TotalSeconds;
-            if (timeInterval < _config.MinTimeIntervalSeconds)
-            {
-                return FilterResult.RejectTimeIntervalTooShort;
-            }
-
-            // 计算距离
-            double distance = GeoCalculator.CalculateDistance(lastLocation, location);
-
-            // 检查最小距离
-            if (distance < _config.MinDistanceMeters)
-            {
-                return FilterResult.RejectDistanceTooSmall;
-            }
-
-            // 计算速度
-            double speedMps = GeoCalculator.CalculateSpeed(lastLocation, location);
-            double speedKmh = GeoCalculator.MetersPerSecondToKmPerHour(speedMps);
-
-            // 检查最大速度
-            if (speedKmh > _config.MaxSpeedKmPerHour)
-            {
-                return FilterResult.RejectSpeedTooFast;
-            }
-
-            // 接受此位置
-            _lastAcceptedLocation = location;
-            return FilterResult.Accept;
-        }
-
-        /// <summary>
-        /// 重置过滤器
-        /// </summary>
-        public void Reset()
-        {
-            _lastAcceptedLocation = null;
-        }
-
-        /// <summary>
-        /// 获取最后接受的位置
-        /// </summary>
-        public GeoCoordinate? LastAcceptedLocation => _lastAcceptedLocation;
+    public void Reset()
+    {
+        _lastAcceptedLocation = null;
+        _lastObservationTime = null;
     }
 }

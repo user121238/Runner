@@ -27,6 +27,9 @@ namespace Runner.Business.Location
         /// </summary>
         event Action<string>? OnError;
 
+        /// <summary>定位质量和采样状态，不将“有定位但位移不足”误报成无数据。</summary>
+        event Action<string>? OnStatusUpdated;
+
         /// <summary>
         /// 开始追踪
         /// </summary>

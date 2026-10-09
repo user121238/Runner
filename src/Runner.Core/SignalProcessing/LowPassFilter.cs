@@ -14,6 +14,8 @@ namespace Runner.Core.SignalProcessing
         /// <param name="alpha">滤波系数 (0-1)，越小越平滑，越大越接近原始值</param>
         public LowPassFilter(float alpha)
         {
+            if (!float.IsFinite(alpha) || alpha <= 0 || alpha > 1)
+                throw new ArgumentOutOfRangeException(nameof(alpha));
             _alpha = alpha;
         }
 
@@ -24,6 +26,8 @@ namespace Runner.Core.SignalProcessing
         /// <returns>滤波后的值</returns>
         public float Filter(float value)
         {
+            if (!float.IsFinite(value))
+                throw new ArgumentOutOfRangeException(nameof(value));
             _filteredValue = _alpha * value + (1 - _alpha) * _filteredValue;
             return _filteredValue;
         }

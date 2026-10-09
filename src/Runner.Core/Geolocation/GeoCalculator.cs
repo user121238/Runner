@@ -1,24 +1,5 @@
-namespace Runner.Core.Geolocation
+﻿namespace Runner.Core.Geolocation
 {
-    /// <summary>
-    /// GPS 坐标
-    /// </summary>
-    public readonly struct GeoCoordinate
-    {
-        public double Latitude { get; init; }
-        public double Longitude { get; init; }
-        public double Altitude { get; init; }
-        public DateTimeOffset Timestamp { get; init; }
-
-        public GeoCoordinate(double latitude, double longitude, double altitude = 0, DateTimeOffset? timestamp = null)
-        {
-            Latitude = latitude;
-            Longitude = longitude;
-            Altitude = altitude;
-            Timestamp = timestamp ?? DateTimeOffset.UtcNow;
-        }
-    }
-
     /// <summary>
     /// 地理计算工具 - 计算GPS坐标之间的距离和速度
     /// </summary>
@@ -31,6 +12,8 @@ namespace Runner.Core.Geolocation
         /// </summary>
         public static double CalculateDistance(GeoCoordinate from, GeoCoordinate to)
         {
+            if (!from.IsValid) throw new ArgumentOutOfRangeException(nameof(from));
+            if (!to.IsValid) throw new ArgumentOutOfRangeException(nameof(to));
             double lat1Rad = DegreesToRadians(from.Latitude);
             double lat2Rad = DegreesToRadians(to.Latitude);
             double deltaLat = DegreesToRadians(to.Latitude - from.Latitude);
@@ -40,6 +23,7 @@ namespace Runner.Core.Geolocation
                       Math.Cos(lat1Rad) * Math.Cos(lat2Rad) *
                       Math.Sin(deltaLon / 2) * Math.Sin(deltaLon / 2);
 
+            a = Math.Clamp(a, 0, 1);
             double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
 
             return EARTH_RADIUS_METERS * c;

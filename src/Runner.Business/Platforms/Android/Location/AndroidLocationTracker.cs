@@ -3,206 +3,136 @@ using Android.Locations;
 using Android.OS;
 using Runner.Business.Location;
 using Runner.Core.Geolocation;
+using Runner.Core.SignalProcessing;
 using Debug = System.Diagnostics.Debug;
 
-namespace Runner.Business.Platforms.Android.Location
+namespace Runner.Business.Platforms.Android.Location;
+
+public class AndroidLocationTracker : Java.Lang.Object, ILocationTracker, ILocationListener
 {
-    /// <summary>
-    /// Android 位置追踪器实现
-    /// 使用高频GPS（1秒更新）进行距离测算
-    /// </summary>
-    public class AndroidLocationTracker : Java.Lang.Object, ILocationTracker, ILocationListener
+    private readonly Context _context;
+    private LocationManager? _locationManager;
+    private readonly DistanceTracker _distanceTracker;
+    private readonly SensorClock _clock = new(SystemClock.ElapsedRealtimeNanos);
+    private Timer? _speedTimer;
+    private volatile bool _isTracking;
+
+    public event Action<GeoCoordinate>? OnLocationUpdated;
+    public event Action<double>? OnDistanceUpdated;
+    public event Action<double>? OnSpeedUpdated;
+    public event Action<string>? OnError;
+    public event Action<string>? OnStatusUpdated;
+    public bool IsTracking => _isTracking;
+
+    public AndroidLocationTracker(Context context, LocationFilterConfig? filterConfig = null)
     {
-        private readonly Context _context;
-        private LocationManager? _locationManager;
-        private readonly DistanceTracker _distanceTracker;
-        private bool _isTracking;
+        _context = context.ApplicationContext ?? context;
+        _distanceTracker = new DistanceTracker(filterConfig, _clock);
+    }
 
-        // GPS 更新配置
-        private const long MIN_TIME_MS = 1000; // 1秒更新
-        private const float MIN_DISTANCE_METERS = 0; // 不限制最小距离，让过滤器处理
+    public Task StartAsync()
+    {
+        if (_isTracking) return Task.CompletedTask;
+        _locationManager = (LocationManager?)_context.GetSystemService(Context.LocationService)
+            ?? throw new InvalidOperationException("获取位置服务失败");
+        if (!_locationManager.IsProviderEnabled(LocationManager.GpsProvider))
+            throw new InvalidOperationException("GPS未启用，请在设置中开启GPS");
 
-        public event Action<GeoCoordinate>? OnLocationUpdated;
-        public event Action<double>? OnDistanceUpdated;
-        public event Action<double>? OnSpeedUpdated;
-        public event Action<string>? OnError;
+        _distanceTracker.BeginSegment();
+        _locationManager.RequestLocationUpdates(LocationManager.GpsProvider, 1000, 0, this, Looper.MainLooper);
+        _isTracking = true;
+        _speedTimer = new Timer(UpdateSpeed, null, 1000, 1000);
+        OnStatusUpdated?.Invoke("正在定位，请到开阔处");
+        Debug.WriteLine("[Runner.Gps] tracking started");
+        return Task.CompletedTask;
+    }
 
-        public bool IsTracking => _isTracking;
+    public void Stop()
+    {
+        _isTracking = false;
+        _speedTimer?.Dispose();
+        _speedTimer = null;
+        _locationManager?.RemoveUpdates(this);
+        _distanceTracker.BeginSegment();
+        OnSpeedUpdated?.Invoke(0);
+        OnStatusUpdated?.Invoke("已停止");
+        Debug.WriteLine("[Runner.Gps] tracking stopped; segment closed");
+    }
 
-        public AndroidLocationTracker(Context context, LocationFilterConfig? filterConfig = null)
+    public void Reset()
+    {
+        _distanceTracker.Reset();
+        OnDistanceUpdated?.Invoke(0);
+        OnSpeedUpdated?.Invoke(0);
+        Debug.WriteLine("[Runner.Gps] distance reset");
+    }
+
+    public double GetTotalDistanceMeters() => _distanceTracker.TotalDistanceMeters;
+    public double GetTotalDistanceKm() => _distanceTracker.TotalDistanceKm;
+    public double GetCurrentSpeedKmh() => _distanceTracker.GetCurrentSpeedKmh();
+    public double GetAverageSpeedKmh() => _distanceTracker.GetAverageSpeedKmh();
+
+    public void OnLocationChanged(global::Android.Locations.Location location)
+    {
+        if (!_isTracking) return;
+        try
         {
-            _context = context;
-            _distanceTracker = new DistanceTracker(filterConfig ?? new LocationFilterConfig
+            var coordinate = new GeoCoordinate(location.Latitude, location.Longitude, location.Altitude,
+                _clock.GetSampleTime(location.ElapsedRealtimeNanos),
+                location.HasAccuracy ? location.Accuracy : double.PositiveInfinity,
+                location.HasSpeed ? location.Speed : null);
+            bool accepted = _distanceTracker.AddLocation(coordinate, out var result);
+            string status = result switch
             {
-                MinDistanceMeters = 5.0,      // 最小5米
-                MaxSpeedKmPerHour = 15.0,     // 最大15公里/小时（跑步速度）
-                MinTimeIntervalSeconds = 0.5   // 最小0.5秒间隔
-            });
+                FilterResult.Accept => $"GPS有效 ±{location.Accuracy:F1}米 · {_distanceTracker.TrajectoryPointCount}个轨迹点",
+                FilterResult.RejectDistanceTooSmall => $"GPS有效 ±{location.Accuracy:F1}米 · 位移未超过精度门限",
+                FilterResult.RejectAccuracyTooPoor => $"定位较弱 ±{location.Accuracy:F0}米 · 暂不计入距离",
+                FilterResult.RejectStaleLocation => "正在定位 · 已忽略过期采样",
+                FilterResult.RejectFutureLocation => "定位时间异常 · 已忽略采样",
+                FilterResult.RejectSpeedTooFast => "GPS异常跳点 · 暂不计入距离",
+                _ => "正在等待有效定位"
+            };
+            OnStatusUpdated?.Invoke(status);
+            // 诊断只记录精度和算法结果，不记录用户经纬度。
+            Debug.WriteLine($"[Runner.Gps] result={result} accuracy={location.Accuracy:F1}m ageMs={(_clock.GetUtcNow() - coordinate.Timestamp).TotalMilliseconds:F0} distance={_distanceTracker.TotalDistanceMeters:F1}m speed={_distanceTracker.GetCurrentSpeedKmh():F1}km/h");
+            if (accepted)
+            {
+                OnLocationUpdated?.Invoke(coordinate);
+                OnDistanceUpdated?.Invoke(_distanceTracker.TotalDistanceMeters);
+            }
+            OnSpeedUpdated?.Invoke(_distanceTracker.GetCurrentSpeedKmh());
         }
-
-        public async Task StartAsync()
+        catch (Exception ex)
         {
-            if (_isTracking)
-            {
-                Debug.WriteLine("[AndroidLocationTracker] 已经在追踪中");
-                return;
-            }
-
-            try
-            {
-                Debug.WriteLine("[AndroidLocationTracker] 开始位置追踪");
-
-                _locationManager = (LocationManager?)_context.GetSystemService(Context.LocationService);
-
-                if (_locationManager == null)
-                {
-                    throw new InvalidOperationException("无法获取 LocationManager");
-                }
-
-                // 检查GPS是否可用
-                bool gpsEnabled = _locationManager.IsProviderEnabled(LocationManager.GpsProvider);
-                Debug.WriteLine($"[AndroidLocationTracker] GPS 状态: {(gpsEnabled ? "已启用" : "未启用")}");
-
-                if (!gpsEnabled)
-                {
-                    OnError?.Invoke("GPS未启用，请在设置中开启GPS");
-                    return;
-                }
-
-                // 请求位置更新
-                _locationManager.RequestLocationUpdates(
-                    LocationManager.GpsProvider,
-                    MIN_TIME_MS,
-                    MIN_DISTANCE_METERS,
-                    this
-                );
-
-                _isTracking = true;
-                Debug.WriteLine("[AndroidLocationTracker] 位置追踪已启动");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[AndroidLocationTracker] 启动失败: {ex}");
-                OnError?.Invoke($"启动失败: {ex.Message}");
-                throw;
-            }
+            Debug.WriteLine($"[Runner.Gps] update failed: {ex}");
+            OnError?.Invoke($"处理位置失败: {ex.Message}");
         }
+    }
 
-        public void Stop()
-        {
-            if (!_isTracking)
-            {
-                Debug.WriteLine("[AndroidLocationTracker] 未在追踪中");
-                return;
-            }
+    private void UpdateSpeed(object? state)
+    {
+        if (!_isTracking) return;
+        // 无新定位时也刷新 UI，使过期的速度在三秒后归零。
+        OnSpeedUpdated?.Invoke(_distanceTracker.GetCurrentSpeedKmh());
+    }
 
-            try
-            {
-                Debug.WriteLine("[AndroidLocationTracker] 停止位置追踪");
+    public void OnProviderDisabled(string provider)
+    {
+        if (provider == LocationManager.GpsProvider) OnError?.Invoke("GPS已被禁用");
+    }
 
-                _locationManager?.RemoveUpdates(this);
-                _isTracking = false;
+    public void OnProviderEnabled(string provider) { }
+    public void OnStatusChanged(string? provider, Availability status, Bundle? extras) { }
 
-                Debug.WriteLine("[AndroidLocationTracker] 位置追踪已停止");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[AndroidLocationTracker] 停止失败: {ex}");
-                OnError?.Invoke($"停止失败: {ex.Message}");
-            }
-        }
-
-        public void Reset()
-        {
-            Debug.WriteLine("[AndroidLocationTracker] 重置距离追踪");
-            _distanceTracker.Reset();
-            OnDistanceUpdated?.Invoke(0);
-            OnSpeedUpdated?.Invoke(0);
-        }
-
-        public double GetTotalDistanceMeters() => _distanceTracker.TotalDistanceMeters;
-
-        public double GetTotalDistanceKm() => _distanceTracker.TotalDistanceKm;
-
-        public double GetCurrentSpeedKmh() => _distanceTracker.GetCurrentSpeedKmh();
-
-        public double GetAverageSpeedKmh() => _distanceTracker.GetAverageSpeedKmh();
-
-        // ILocationListener 实现
-        public void OnLocationChanged(global::Android.Locations.Location location)
-        {
-            try
-            {
-                // 转换为 GeoCoordinate
-                var coordinate = new GeoCoordinate(
-                    location.Latitude,
-                    location.Longitude,
-                    location.Altitude,
-                    DateTimeOffset.FromUnixTimeMilliseconds(location.Time)
-                );
-
-                Debug.WriteLine($"[AndroidLocationTracker] 收到位置: Lat={coordinate.Latitude:F6}, Lon={coordinate.Longitude:F6}, Accuracy={location.Accuracy:F1}m");
-
-                // 添加到距离追踪器（会自动过滤）
-                bool accepted = _distanceTracker.AddLocation(coordinate, out var filterResult);
-
-                if (accepted)
-                {
-                    Debug.WriteLine($"[AndroidLocationTracker] ✓ 位置已接受 - 总距离: {_distanceTracker.TotalDistanceMeters:F1}m, 当前速度: {_distanceTracker.GetCurrentSpeedKmh():F1}km/h");
-
-                    // 触发事件
-                    OnLocationUpdated?.Invoke(coordinate);
-                    OnDistanceUpdated?.Invoke(_distanceTracker.TotalDistanceMeters);
-                    OnSpeedUpdated?.Invoke(_distanceTracker.GetCurrentSpeedKmh());
-                }
-                else
-                {
-                    // 输出详细的拒绝原因
-                    string reason = filterResult switch
-                    {
-                        FilterResult.RejectDistanceTooSmall => "距离太小（GPS漂移）",
-                        FilterResult.RejectSpeedTooFast => "速度太快（GPS跳变）",
-                        FilterResult.RejectTimeIntervalTooShort => "时间间隔太短",
-                        _ => "未知原因"
-                    };
-                    Debug.WriteLine($"[AndroidLocationTracker] ✗ 位置被拒绝 - 原因: {reason}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[AndroidLocationTracker] 处理位置更新失败: {ex}");
-                OnError?.Invoke($"处理位置失败: {ex.Message}");
-            }
-        }
-
-        public void OnProviderDisabled(string provider)
-        {
-            Debug.WriteLine($"[AndroidLocationTracker] 提供者已禁用: {provider}");
-            if (provider == LocationManager.GpsProvider)
-            {
-                OnError?.Invoke("GPS已被禁用");
-            }
-        }
-
-        public void OnProviderEnabled(string provider)
-        {
-            Debug.WriteLine($"[AndroidLocationTracker] 提供者已启用: {provider}");
-        }
-
-        public void OnStatusChanged(string? provider, Availability status, Bundle? extras)
-        {
-            Debug.WriteLine($"[AndroidLocationTracker] 状态变化: {provider} - {status}");
-        }
-
-        public new void Dispose()
-        {
-            Stop();
-            _locationManager = null;
-            OnLocationUpdated = null;
-            OnDistanceUpdated = null;
-            OnSpeedUpdated = null;
-            OnError = null;
-            base.Dispose();
-        }
+    public new void Dispose()
+    {
+        Stop();
+        _locationManager = null;
+        OnLocationUpdated = null;
+        OnDistanceUpdated = null;
+        OnSpeedUpdated = null;
+        OnError = null;
+        OnStatusUpdated = null;
+        base.Dispose();
     }
 }

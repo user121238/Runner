@@ -38,37 +38,29 @@ public partial class MainViewModel : BaseViewModel
 
         Task.Run(() => _cadencePlay.Init(ResourceConstant.Raw.beep3));
 
-        // 初始化计步器
-        InitPedometer();
-
-        // 初始化GPS追踪器
-        InitGpsTracker();
+        // 权限请求串行执行，避免首次安装时多个权限对话框互相打断。
+        MainThread.BeginInvokeOnMainThread(async () => await InitializeTrackingAsync());
     }
 
-    private void InitPedometer()
+    private async Task InitializeTrackingAsync()
     {
+        await RequestActivityRecognitionPermission();
+        await RequestLocationPermission();
+
+        // location 类型前台服务必须在定位授权后、应用位于前台时启动。
+        if (_locationTracker == null) return;
         try
         {
-            System.Diagnostics.Debug.WriteLine("[MainViewModel] 开始初始化计步器");
-
-            if (DeviceInfo.Current.Platform != DevicePlatform.Android)
-            {
-                _pedometerStatus = "仅支持Android设备";
-                System.Diagnostics.Debug.WriteLine("[MainViewModel] 非Android平台，跳过初始化");
-                return;
-            }
-
-            // 在主线程上异步请求权限
-            MainThread.BeginInvokeOnMainThread(async () =>
-            {
-                await RequestActivityRecognitionPermission();
-            });
+            await Permissions.RequestAsync<Permissions.PostNotifications>();
+            var activity = Platform.CurrentActivity;
+            if (activity != null)
+                activity.StartForegroundService(new Android.Content.Intent(activity,
+                    typeof(Runner.Business.Platforms.Android.Services.RunnerService)));
         }
         catch (Exception ex)
         {
-            _pedometerStatus = $"初始化失败: {ex.Message}";
-            Logger?.LogError(ex, "初始化计步器失败");
-            System.Diagnostics.Debug.WriteLine($"[MainViewModel] 初始化失败: {ex}");
+            Logger?.LogError(ex, "启动运动前台服务失败");
+            GpsStatus = $"后台服务启动失败: {ex.Message}";
         }
     }
 
@@ -101,7 +93,7 @@ public partial class MainViewModel : BaseViewModel
                 System.Diagnostics.Debug.WriteLine($"[MainViewModel] 权限被拒绝: {status}");
                 await MainThread.InvokeOnMainThreadAsync(() =>
                 {
-                    _pedometerStatus = "需要活动识别权限";
+                    PedometerStatus = "需要活动识别权限";
                 });
             }
         }
@@ -110,7 +102,7 @@ public partial class MainViewModel : BaseViewModel
             System.Diagnostics.Debug.WriteLine($"[MainViewModel] 权限请求异常: {ex}");
             await MainThread.InvokeOnMainThreadAsync(() =>
             {
-                _pedometerStatus = $"权限请求失败: {ex.Message}";
+                PedometerStatus = $"权限请求失败: {ex.Message}";
             });
         }
     }
@@ -129,13 +121,13 @@ public partial class MainViewModel : BaseViewModel
 
             // 显示传感器类型
             string sensorType = _stepCounter is HardwareStepCounter ? "硬件传感器" : "加速度传感器";
-            _pedometerStatus = $"使用{sensorType}";
+            PedometerStatus = $"使用{sensorType}";
 
             System.Diagnostics.Debug.WriteLine($"[MainViewModel] 计步器初始化成功 - {sensorType}");
         }
         catch (Exception ex)
         {
-            _pedometerStatus = $"初始化失败: {ex.Message}";
+            PedometerStatus = $"初始化失败: {ex.Message}";
             Logger?.LogError(ex, "初始化计步器失败");
             System.Diagnostics.Debug.WriteLine($"[MainViewModel] 创建计步器失败: {ex}");
         }
@@ -237,7 +229,9 @@ public partial class MainViewModel : BaseViewModel
         {
             _stepCounter.Start();
             _isPedometerActive = true;
-            PedometerStatus = "运行中";
+            PedometerStatus = _stepCounter is HardwareStepCounter
+                ? "运行中（硬件可能先确认多步再上报）"
+                : "运行中（加速度兜底，精度需实测）";
             System.Diagnostics.Debug.WriteLine("[MainViewModel] 计步器已启动");
         }
         catch (Exception ex)
@@ -279,6 +273,7 @@ public partial class MainViewModel : BaseViewModel
     [RelayCommand]
     private void ResetStepCount()
     {
+        _stepCounter?.Reset();
         StepCount = 0;
         StepFrequency = 0.0;
     }
@@ -315,7 +310,7 @@ public partial class MainViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            _pedometerStatus = $"切换失败: {ex.Message}";
+            PedometerStatus = $"切换失败: {ex.Message}";
             Logger?.LogError(ex, "切换到加速度传感器失败");
             System.Diagnostics.Debug.WriteLine($"[MainViewModel] 切换失败: {ex}");
         }
@@ -353,7 +348,7 @@ public partial class MainViewModel : BaseViewModel
         }
         catch (Exception ex)
         {
-            _pedometerStatus = $"切换失败: {ex.Message}";
+            PedometerStatus = $"切换失败: {ex.Message}";
             Logger?.LogError(ex, "切换到硬件传感器失败");
             System.Diagnostics.Debug.WriteLine($"[MainViewModel] 切换失败: {ex}");
         }
@@ -362,33 +357,6 @@ public partial class MainViewModel : BaseViewModel
     #endregion
 
     #region GPS 距离追踪
-
-    private void InitGpsTracker()
-    {
-        try
-        {
-            System.Diagnostics.Debug.WriteLine("[MainViewModel] 开始初始化GPS追踪器");
-
-            if (DeviceInfo.Current.Platform != DevicePlatform.Android)
-            {
-                _gpsStatus = "仅支持Android设备";
-                System.Diagnostics.Debug.WriteLine("[MainViewModel] 非Android平台，跳过初始化");
-                return;
-            }
-
-            // 在主线程上异步请求权限
-            MainThread.BeginInvokeOnMainThread(async () =>
-            {
-                await RequestLocationPermission();
-            });
-        }
-        catch (Exception ex)
-        {
-            _gpsStatus = $"初始化失败: {ex.Message}";
-            Logger?.LogError(ex, "初始化GPS追踪器失败");
-            System.Diagnostics.Debug.WriteLine($"[MainViewModel] GPS初始化失败: {ex}");
-        }
-    }
 
     private async Task RequestLocationPermission()
     {
@@ -419,7 +387,7 @@ public partial class MainViewModel : BaseViewModel
                 System.Diagnostics.Debug.WriteLine($"[MainViewModel] 位置权限被拒绝: {status}");
                 await MainThread.InvokeOnMainThreadAsync(() =>
                 {
-                    _gpsStatus = "需要位置权限";
+                    GpsStatus = "需要位置权限";
                 });
             }
         }
@@ -428,7 +396,7 @@ public partial class MainViewModel : BaseViewModel
             System.Diagnostics.Debug.WriteLine($"[MainViewModel] 位置权限请求异常: {ex}");
             await MainThread.InvokeOnMainThreadAsync(() =>
             {
-                _gpsStatus = $"权限请求失败: {ex.Message}";
+                GpsStatus = $"权限请求失败: {ex.Message}";
             });
         }
     }
@@ -440,27 +408,20 @@ public partial class MainViewModel : BaseViewModel
             System.Diagnostics.Debug.WriteLine("[MainViewModel] 创建GPS追踪器");
             var context = Platform.CurrentActivity!;
 
-            // 使用更宽松的测试配置
-            var filterConfig = new Runner.Core.Geolocation.LocationFilterConfig
-            {
-                MinDistanceMeters = 2.0,        // 降低到2米（更敏感）
-                MaxSpeedKmPerHour = 20.0,       // 提高到20公里/小时
-                MinTimeIntervalSeconds = 0.3    // 降低到0.3秒
-            };
-
-            _locationTracker = new AndroidLocationTracker(context, filterConfig);
+            _locationTracker = new AndroidLocationTracker(context);
 
             // 订阅事件
             _locationTracker.OnDistanceUpdated += OnGpsDistanceUpdated;
             _locationTracker.OnSpeedUpdated += OnGpsSpeedUpdated;
             _locationTracker.OnError += OnGpsError;
+            _locationTracker.OnStatusUpdated += OnGpsStatusUpdated;
 
-            _gpsStatus = "已就绪（测试模式）";
-            System.Diagnostics.Debug.WriteLine("[MainViewModel] GPS追踪器创建成功（测试配置）");
+            GpsStatus = "已就绪";
+            System.Diagnostics.Debug.WriteLine("[MainViewModel] GPS追踪器创建成功");
         }
         catch (Exception ex)
         {
-            _gpsStatus = $"创建失败: {ex.Message}";
+            GpsStatus = $"创建失败: {ex.Message}";
             Logger?.LogError(ex, "创建GPS追踪器失败");
             System.Diagnostics.Debug.WriteLine($"[MainViewModel] 创建GPS追踪器失败: {ex}");
         }
@@ -496,6 +457,11 @@ public partial class MainViewModel : BaseViewModel
         {
             GpsStatus = $"错误: {error}";
         });
+    }
+
+    private void OnGpsStatusUpdated(string status)
+    {
+        MainThread.BeginInvokeOnMainThread(() => GpsStatus = status);
     }
 
     public double GpsDistance
@@ -537,7 +503,7 @@ public partial class MainViewModel : BaseViewModel
         try
         {
             await _locationTracker.StartAsync();
-            GpsStatus = "追踪中";
+            GpsStatus = "正在定位，请到开阔处";
             System.Diagnostics.Debug.WriteLine("[MainViewModel] GPS追踪已启动");
         }
         catch (Exception ex)
@@ -600,8 +566,19 @@ public partial class MainViewModel : BaseViewModel
 
     #endregion
 
+    [RelayCommand]
+    private async Task GoToWatchWorkout()
+    {
+        await Navigation.NavigateAsync<WatchWorkoutViewModel>();
+    }
+
     protected override void Dispose(bool disposing)
     {
+        if (!disposing)
+        {
+            base.Dispose(disposing);
+            return;
+        }
 
         _cadencePlay?.Dispose();
 
@@ -611,6 +588,16 @@ public partial class MainViewModel : BaseViewModel
             _stepCounter.OnStepFrequencyChanged -= OnStepFrequencyChanged;
             _stepCounter.Dispose();
             _stepCounter = null;
+        }
+
+        if (_locationTracker != null)
+        {
+            _locationTracker.OnDistanceUpdated -= OnGpsDistanceUpdated;
+            _locationTracker.OnSpeedUpdated -= OnGpsSpeedUpdated;
+            _locationTracker.OnError -= OnGpsError;
+            _locationTracker.OnStatusUpdated -= OnGpsStatusUpdated;
+            _locationTracker.Dispose();
+            _locationTracker = null;
         }
 
         base.Dispose(disposing);

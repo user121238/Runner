@@ -49,8 +49,10 @@ namespace Runner.Business.Platforms.Android.StepCounter
             if (!ForceAccelerometer)
             {
                 // 优先使用硬件计步传感器
-                var stepDetectorSensor = sensorManager.GetDefaultSensor(SensorType.StepDetector);
-                var stepCounterSensor = sensorManager.GetDefaultSensor(SensorType.StepCounter);
+                var stepDetectorSensor = sensorManager.GetDefaultSensor(SensorType.StepDetector, true)
+                    ?? sensorManager.GetDefaultSensor(SensorType.StepDetector);
+                var stepCounterSensor = sensorManager.GetDefaultSensor(SensorType.StepCounter, true)
+                    ?? sensorManager.GetDefaultSensor(SensorType.StepCounter);
 
                 if (stepDetectorSensor != null)
                 {
@@ -63,7 +65,7 @@ namespace Runner.Business.Platforms.Android.StepCounter
                     Debug.WriteLine($"[StepCounterFactory] 找到计步传感器(备份): {stepCounterSensor.Name}");
                 }
 
-                if (stepDetectorSensor != null)
+                if (stepDetectorSensor != null || stepCounterSensor != null)
                 {
                     var counter = new HardwareStepCounter();
                     counter.Init(context);

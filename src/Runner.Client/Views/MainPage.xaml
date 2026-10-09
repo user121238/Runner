@@ -126,11 +126,22 @@
                         <Label FontAttributes="Bold" FontSize="18" Text="GPS 数据" />
                         <StackLayout>
                             <Label Text="{Binding GpsStatus, StringFormat='状态: {0}'}" />
-                            <Label FontAttributes="Bold" FontSize="24" Text="{Binding GpsDistance, StringFormat='距离: {0:F2} 公里'}" />
+                            <Label FontAttributes="Bold" FontSize="24" Text="{Binding GpsDistance, StringFormat='距离: {0:F3} 公里'}" />
                             <Label FontAttributes="Bold" FontSize="20" Text="{Binding GpsSpeed, StringFormat='速度: {0:F1} 公里/小时'}" />
                         </StackLayout>
                     </VerticalStackLayout>
                 </Border>
+                <!--  手表跑步  -->
+                <Border Padding="15" BackgroundColor="#FFE4E1">
+                    <VerticalStackLayout Spacing="10">
+                        <Label FontAttributes="Bold" FontSize="18" Text="手表跑步" />
+                        <Button Command="{Binding GoToWatchWorkoutCommand}"
+                                HeightRequest="50"
+                                Text="连接手表跑步"
+                                WidthRequest="200" />
+                    </VerticalStackLayout>
+                </Border>
+
             </VerticalStackLayout>
 
 

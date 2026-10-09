@@ -4,195 +4,132 @@ using Android.OS;
 using Runner.Core.SignalProcessing;
 using Debug = System.Diagnostics.Debug;
 
-namespace Runner.Business.Platforms.Android.StepCounter
+namespace Runner.Business.Platforms.Android.StepCounter;
+
+public sealed class HardwareStepCounter : Java.Lang.Object, IStepCounter, ISensorEventListener
 {
-    /// <summary>
-    /// 硬件计步传感器实现
-    /// 同时使用 TYPE_STEP_COUNTER (总步数) 和 TYPE_STEP_DETECTOR (步频)
-    /// </summary>
-    public sealed class HardwareStepCounter : Java.Lang.Object, IStepCounter, ISensorEventListener
+    private SensorManager? _sensorManager;
+    private Sensor? _stepCounterSensor;
+    private Sensor? _stepDetectorSensor;
+    private readonly object _sync = new();
+    private readonly StepCountAccumulator _steps = new();
+    private readonly StepCountAccumulator _counterSteps = new();
+    private readonly FrequencyCalculator _cadence = new();
+    private Timer? _timer;
+    private bool _running;
+    private bool _usingDetector;
+    private bool _usingCounter;
+
+    public event Action<int>? OnStepCountChanged;
+    public event Action<double>? OnStepFrequencyChanged;
+
+    public void Init(Context context)
     {
-        private SensorManager? _sensorManager;
-        private Sensor? _stepCounterSensor;
-        private Sensor? _stepDetectorSensor;
+        _sensorManager = (SensorManager?)context.GetSystemService(Context.SensorService);
+        _stepDetectorSensor = _sensorManager?.GetDefaultSensor(SensorType.StepDetector, true)
+            ?? _sensorManager?.GetDefaultSensor(SensorType.StepDetector);
+        _stepCounterSensor = _sensorManager?.GetDefaultSensor(SensorType.StepCounter, true)
+            ?? _sensorManager?.GetDefaultSensor(SensorType.StepCounter);
+        if (_stepDetectorSensor == null && _stepCounterSensor == null)
+            throw new InvalidOperationException("设备不支持硬件计步传感器");
+    }
 
-        // 步数相关
-        private int _totalSteps;
-        private int _counterEventCount;
-
-        // 步频相关
-        private readonly FrequencyCalculator _cadenceCalc = new();
-        private int _detectorEventCount;
-
-        // 定时器相关
-        private Timer? _updateTimer;
-        private const int UPDATE_INTERVAL_MS = 1000; // 每1秒更新一次
-
-        public event Action<int>? OnStepCountChanged;
-        public event Action<double>? OnStepFrequencyChanged;
-
-        public void Init(Context context)
+    public void Start()
+    {
+        lock (_sync)
         {
-            Debug.WriteLine("[HardwareStepCounter] 开始初始化");
-
-            _sensorManager = (SensorManager?)context.GetSystemService(Context.SensorService);
-
-            // 优先使用步态检测传感器（实时计步和步频）
-            _stepDetectorSensor = _sensorManager?.GetDefaultSensor(SensorType.StepDetector);
-
-            // 可选：计步传感器作为备份验证
-            _stepCounterSensor = _sensorManager?.GetDefaultSensor(SensorType.StepCounter);
-
-            if (_stepDetectorSensor == null)
-            {
-                Debug.WriteLine("[HardwareStepCounter] 错误: 步态检测传感器不可用");
-                throw new InvalidOperationException("设备不支持步态检测传感器");
-            }
-
-            Debug.WriteLine($"[HardwareStepCounter] 找到步态检测传感器: {_stepDetectorSensor.Name}");
-
-            if (_stepCounterSensor != null)
-                Debug.WriteLine($"[HardwareStepCounter] 找到计步传感器(备份): {_stepCounterSensor.Name}");
+            if (_running) return;
+            if (_sensorManager == null) throw new InvalidOperationException("计步器未初始化");
+            _steps.BeginSegment();
+            _counterSteps.BeginSegment();
+            _cadence.Reset();
+            _usingDetector = _stepDetectorSensor != null &&
+                _sensorManager.RegisterListener(this, _stepDetectorSensor, SensorDelay.Normal);
+            _usingCounter = _stepCounterSensor != null &&
+                _sensorManager.RegisterListener(this, _stepCounterSensor, SensorDelay.Normal);
+            if (!_usingDetector && !_usingCounter)
+                throw new InvalidOperationException("硬件计步传感器注册失败");
+            _running = true;
+            _timer = new Timer(UpdateCadence, null, 1000, 1000);
+            Debug.WriteLine($"[Runner.Step] 硬件模式: count={(_usingDetector ? _stepDetectorSensor?.Name : _stepCounterSensor?.Name)}; counterCrossCheck={_usingCounter}");
         }
+    }
 
-        public void Start()
+    public void Stop()
+    {
+        lock (_sync)
         {
-            Debug.WriteLine("[HardwareStepCounter] 开始启动传感器");
-
-            if (_sensorManager == null || _stepDetectorSensor == null)
-            {
-                Debug.WriteLine("[HardwareStepCounter] 错误: 未初始化");
-                throw new InvalidOperationException("未初始化");
-            }
-
-            // 先取消注册
-            _sensorManager.UnregisterListener(this);
-
-            // 注册步态检测传感器（主要）
-            bool registered = _sensorManager.RegisterListener(this, _stepDetectorSensor, SensorDelay.Normal);
-            Debug.WriteLine($"[HardwareStepCounter] 步态检测传感器注册结果: {registered}");
-
-            if (!registered)
-            {
-                Debug.WriteLine("[HardwareStepCounter] 错误: 传感器注册失败");
-                throw new InvalidOperationException("传感器注册失败，可能缺少权限或传感器不可用");
-            }
-
-            // 可选：注册计步传感器作为备份验证
-            if (_stepCounterSensor != null)
-            {
-                bool counterRegistered = _sensorManager.RegisterListener(this, _stepCounterSensor, SensorDelay.Normal);
-                Debug.WriteLine($"[HardwareStepCounter] 计步传感器(备份)注册结果: {counterRegistered}");
-            }
-
-            // 启动定时器，每1秒更新一次步频
-            _updateTimer = new Timer(OnTimerUpdate, null, UPDATE_INTERVAL_MS, UPDATE_INTERVAL_MS);
-            Debug.WriteLine("[HardwareStepCounter] 步频更新定时器已启动");
-        }
-
-        public void Stop()
-        {
-            Debug.WriteLine("[HardwareStepCounter] 停止传感器");
-
-            // 停止定时器
-            _updateTimer?.Dispose();
-            _updateTimer = null;
-
+            _running = false;
+            _timer?.Dispose();
+            _timer = null;
             _sensorManager?.UnregisterListener(this);
+            _steps.BeginSegment();
+            _counterSteps.BeginSegment();
+            _cadence.Reset();
+            OnStepFrequencyChanged?.Invoke(0);
         }
+    }
 
-
-        public void OnSensorChanged(SensorEvent? e)
+    public void Reset()
+    {
+        lock (_sync)
         {
-            if (e?.Sensor == null || e.Values == null)
-                return;
+            _steps.Reset();
+            _counterSteps.Reset();
+            _cadence.Reset();
+            OnStepCountChanged?.Invoke(0);
+            OnStepFrequencyChanged?.Invoke(0);
+        }
+    }
 
-            // 根据传感器类型分别处理
-            if (e.Sensor.Type == SensorType.StepCounter)
+    public void OnSensorChanged(SensorEvent? e)
+    {
+        if (e?.Sensor == null || e.Values == null || e.Values.Count == 0) return;
+        lock (_sync)
+        {
+            if (!_running) return;
+            long time = e.Timestamp / 1_000_000;
+            if (_usingDetector && e.Sensor.Type == SensorType.StepDetector)
             {
-                HandleStepCounter(e);
-
+                _steps.AddStep();
+                _cadence.AddEvent(time);
+                Debug.WriteLine($"[Runner.Step] detector event ageMs={SystemClock.ElapsedRealtime() - time}");
             }
-            else if (e.Sensor.Type == SensorType.StepDetector)
+            else if (_usingCounter && e.Sensor.Type == SensorType.StepCounter)
             {
-                HandleStepDetector(e);
+                int before = _counterSteps.Count;
+                _counterSteps.UpdateHardwareTotal((int)e.Values[0]);
+                if (!_usingDetector) _cadence.AddEvents(time, _counterSteps.Count - before);
+                Debug.WriteLine($"[Runner.Step] counter delta={_counterSteps.Count - before} total={_counterSteps.Count} ageMs={SystemClock.ElapsedRealtime() - time}");
             }
+            else return;
+            OnStepCountChanged?.Invoke(CurrentCount);
         }
+    }
 
-        private void HandleStepCounter(SensorEvent e)
+    private void UpdateCadence(object? state)
+    {
+        lock (_sync)
         {
-            _counterEventCount++;
-
-            if (e.Values!.Count == 0)
-                return;
-
-            int hardwareSteps = (int)e.Values[0];
-
-            // 仅用于日志对比验证
-            Debug.WriteLine($"[HardwareStepCounter] 计步传感器报告: {hardwareSteps} (检测器计数: {_totalSteps})");
+            if (!_running) return;
+            double cadence = _cadence.GetFrequency(SystemClock.ElapsedRealtime());
+            Debug.WriteLine($"[Runner.Step] hardware count={CurrentCount} cadence={cadence:F1}");
+            OnStepFrequencyChanged?.Invoke(cadence);
         }
+    }
 
-        private void HandleStepDetector(SensorEvent e)
-        {
-            _detectorEventCount++;
-            _totalSteps++;
+    public void OnAccuracyChanged(Sensor? sensor, SensorStatus accuracy) { }
 
-            long timestampMs = e.Timestamp / 1_000_000;
+    private int CurrentCount => _usingDetector ? _steps.Count : _counterSteps.Count;
 
-            _cadenceCalc.AddEvent(timestampMs);
-
-            Debug.WriteLine($"[HardwareStepCounter] 检测到第 {_totalSteps} 步 - 时间戳: {timestampMs}");
-
-            // 立即更新步数
-            OnStepCountChanged?.Invoke(_totalSteps);
-
-            // 步频由定时器更新，这里不更新
-        }
-
-        private void OnTimerUpdate(object? state)
-        {
-            try
-            {
-                Debug.WriteLine("[HardwareStepCounter] 定时器触发");
-
-                long currentTimeMs = SystemClock.ElapsedRealtime();
-                Debug.WriteLine($"[HardwareStepCounter] 当前时间: {currentTimeMs}");
-
-                // 计算步频
-                double frequency = _cadenceCalc.GetFrequency(currentTimeMs);
-
-                Debug.WriteLine($"[HardwareStepCounter] 计算得到步频: {frequency:F1} SPM");
-
-                // 触发步频更新事件
-                OnStepFrequencyChanged?.Invoke(frequency);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[HardwareStepCounter] 定时器更新异常: {ex}");
-            }
-        }
-
-
-        public void OnAccuracyChanged(Sensor? sensor, SensorStatus accuracy)
-        {
-            Debug.WriteLine($"[HardwareStepCounter] 精度变化: {sensor?.Type} - {accuracy}");
-        }
-
-        public new void Dispose()
-        {
-            Debug.WriteLine($"[HardwareStepCounter] 释放资源 - 计步事件: {_counterEventCount}, 步态检测事件: {_detectorEventCount}");
-
-            // 停止定时器
-            _updateTimer?.Dispose();
-            _updateTimer = null;
-
-            Stop();
-            _sensorManager = null;
-            _stepCounterSensor = null;
-            _stepDetectorSensor = null;
-            OnStepCountChanged = null;
-            OnStepFrequencyChanged = null;
-            base.Dispose();
-        }
+    public new void Dispose()
+    {
+        Stop();
+        _sensorManager = null;
+        _stepCounterSensor = null;
+        _stepDetectorSensor = null;
+        OnStepCountChanged = null;
+        OnStepFrequencyChanged = null;
+        base.Dispose();
     }
 }

@@ -23,11 +23,9 @@ namespace Runner.Business.Platforms.Android.Services
 
 
             // 2. 构建通知，点击通知可以回到应用
-            // 注意：这里需要 MainActivity 的类型，但它在 Client 层
-            // 可以通过配置或反射来获取
-            var mainActivityType = Type.GetType("Runner.Client.Platforms.Android.MainActivity, Runner.Client");
-            var pendingIntent = mainActivityType != null
-                ? PendingIntent.GetActivity(this, 0, new Intent(this, mainActivityType), PendingIntentFlags.Immutable)
+            var launchIntent = PackageManager?.GetLaunchIntentForPackage(PackageName!);
+            var pendingIntent = launchIntent != null
+                ? PendingIntent.GetActivity(this, 0, launchIntent, PendingIntentFlags.Immutable)
                 : null;
 
             var notification = new Notification.Builder(this, CHANNEL_ID)

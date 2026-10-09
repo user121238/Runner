@@ -2,9 +2,11 @@
 using DM.Maui.Framework.Data.Extensions;
 using Microsoft.Extensions.Logging;
 using Prism.Ioc;
+using Runner.Business.Platforms.Android.Media;
 using Runner.Business.Platforms.Android.Session;
 using Runner.Business.Services.Ble;
 using Runner.Business.Services.Database;
+using Runner.Business.Services.Settings;
 using Runner.Client.ViewModels;
 using Runner.Client.Views;
 
@@ -36,13 +38,16 @@ namespace Runner.Client
                     })
                     .CreateWindow("NavigationPage/MainPage"));
 
-            // 数据库（P4 记录与设置使用）
+            // 数据库：设置与记录共用一个 LiteDB 文件
             var dbPath = Path.Combine(FileSystem.AppDataDirectory, "runner.db");
             builder.Services.AddLiteDbDataAccess(dbPath);
+            builder.Services.AddSingleton<RunSettingsStore>();
 
-            // 运动会话宿主：应用级单例，持有 GPS / 计步 / 节拍器
-            builder.Services.AddSingleton(sp =>
-                new RunSessionHost(ResourceConstant.Raw.beep3, sp.GetRequiredService<ILogger<RunSessionHost>>()));
+            // 运动会话宿主：应用级单例，持有 GPS / 计步 / 节拍器与提醒输出
+            builder.Services.AddSingleton(sp => new RunSessionHost(
+                new MetronomeSounds(ResourceConstant.Raw.beep3, ResourceConstant.Raw.beep1, ResourceConstant.Raw.beep2),
+                sp.GetRequiredService<RunSettingsStore>(),
+                sp.GetRequiredService<ILogger<RunSessionHost>>()));
 
             // 手表线（冻结）：注册保留，界面入口已移除
             builder.Services.AddSingleton<IWatchBleService, WatchBleService>();

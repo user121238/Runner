@@ -1,22 +1,25 @@
 ﻿using Microsoft.Extensions.Logging;
 using Runner.Business.Location;
+using Runner.Business.Platforms.Android.Alerts;
 using Runner.Business.Platforms.Android.Location;
 using Runner.Business.Platforms.Android.Media;
 using Runner.Business.Platforms.Android.Permissions;
 using Runner.Business.Platforms.Android.StepCounter;
+using Runner.Business.Services.Settings;
 using MauiPermissions = Microsoft.Maui.ApplicationModel.Permissions;
 
 namespace Runner.Business.Platforms.Android.Session;
 
 /// <summary>
-/// 应用级单例：申请权限、创建并持有 GPS / 计步 / 节拍器来源和会话控制器。
+/// 应用级单例：申请权限、创建并持有 GPS / 计步 / 节拍器来源、提醒输出和会话控制器。
 /// 页面只消费它，不各自创建监听器。
 /// </summary>
 public sealed class RunSessionHost : IDisposable
 {
-    private readonly int _metronomeSoundResourceId;
+    private readonly MetronomeSounds _sounds;
     private readonly ILogger<RunSessionHost> _logger;
     private readonly CadencePlay _metronome = new();
+    private readonly CadenceAlertNotifier _notifier;
     private Task? _initialization;
     private IStepCounter? _stepCounter;
     private ILocationTracker? _locationTracker;
@@ -26,12 +29,15 @@ public sealed class RunSessionHost : IDisposable
     public event Action? Updated;
     public event Action<string>? Error;
 
-    public RunSessionHost(int metronomeSoundResourceId, ILogger<RunSessionHost> logger)
+    public RunSessionHost(MetronomeSounds sounds, RunSettingsStore settings, ILogger<RunSessionHost> logger)
     {
-        _metronomeSoundResourceId = metronomeSoundResourceId;
+        _sounds = sounds;
+        Settings = settings;
         _logger = logger;
+        _notifier = new CadenceAlertNotifier(_metronome, new AndroidVibrator());
     }
 
+    public RunSettingsStore Settings { get; }
     public bool IsInitialized => _controller != null;
     public RunSessionController? Controller => _controller;
     public IStepCounter? StepCounter => _stepCounter;
@@ -47,7 +53,7 @@ public sealed class RunSessionHost : IDisposable
     private async Task InitializeCoreAsync()
     {
         // 音频资源加载不阻塞 UI 线程
-        _ = Task.Run(() => _metronome.Init(_metronomeSoundResourceId));
+        _ = Task.Run(() => _metronome.Init(_sounds));
 
         await CreateStepCounterAsync(forceAccelerometer: false);
         await CreateLocationTrackerAsync();
@@ -136,7 +142,7 @@ public sealed class RunSessionHost : IDisposable
             _controller.Dispose();
         }
 
-        _controller = new RunSessionController(Platform.AppContext, _locationTracker, _stepCounter, _metronome);
+        _controller = new RunSessionController(Platform.AppContext, _locationTracker, _stepCounter, _metronome, _notifier);
         _controller.Updated += OnControllerUpdated;
         _controller.Error += OnControllerError;
         Updated?.Invoke();

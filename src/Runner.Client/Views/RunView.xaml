@@ -34,7 +34,7 @@
                     <Label Style="{StaticResource Caption}" Text="公里" />
                 </VerticalStackLayout>
                 <VerticalStackLayout Grid.Column="1" Spacing="2">
-                    <Label FontSize="56" Style="{StaticResource Metric}" Text="{Binding CadenceText}" />
+                    <Label FontSize="56" Style="{StaticResource Metric}" Text="{Binding CadenceText}" TextColor="{Binding CadenceColor}" />
                     <Label Style="{StaticResource Caption}" Text="步频 SPM" />
                 </VerticalStackLayout>
             </Grid>

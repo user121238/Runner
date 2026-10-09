@@ -6,17 +6,93 @@
              x:DataType="vm:SettingsViewModel"
              BackgroundColor="Black">
 
-    <VerticalStackLayout Padding="24,40,24,24" Spacing="16">
-        <Label FontSize="22" Text="设置" TextColor="White" />
-        <Label FontSize="14" Text="目标步频、提醒阈值与开关将在后续版本加入。" TextColor="#9E9E9E" />
+    <ContentView.Resources>
+        <Style x:Key="Card" TargetType="Border">
+            <Setter Property="BackgroundColor" Value="#1E1E1E" />
+            <Setter Property="StrokeThickness" Value="0" />
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="StrokeShape" Value="RoundRectangle 12" />
+        </Style>
+        <Style x:Key="Title" TargetType="Label">
+            <Setter Property="TextColor" Value="White" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="VerticalTextAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="Hint" TargetType="Label">
+            <Setter Property="TextColor" Value="#9E9E9E" />
+            <Setter Property="FontSize" Value="12" />
+        </Style>
+        <Style x:Key="Stepper" TargetType="Button">
+            <Setter Property="BackgroundColor" Value="#333333" />
+            <Setter Property="TextColor" Value="White" />
+            <Setter Property="FontSize" Value="24" />
+            <Setter Property="WidthRequest" Value="56" />
+            <Setter Property="HeightRequest" Value="56" />
+            <Setter Property="CornerRadius" Value="28" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <Style x:Key="Value" TargetType="Label">
+            <Setter Property="TextColor" Value="White" />
+            <Setter Property="FontSize" Value="32" />
+            <Setter Property="FontAttributes" Value="Bold" />
+            <Setter Property="WidthRequest" Value="80" />
+            <Setter Property="HorizontalTextAlignment" Value="Center" />
+            <Setter Property="VerticalTextAlignment" Value="Center" />
+        </Style>
+    </ContentView.Resources>
 
-        <Button BackgroundColor="#222222"
-                Command="{Binding OpenDiagnosticsCommand}"
-                CornerRadius="8"
-                FontSize="18"
-                HeightRequest="56"
-                Text="诊断"
-                TextColor="White" />
-    </VerticalStackLayout>
+    <ScrollView>
+        <VerticalStackLayout Padding="24,40,24,24" Spacing="16">
+            <Label FontSize="22" Text="设置" TextColor="White" />
+
+            <!--  目标步频  -->
+            <Border Style="{StaticResource Card}">
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto" RowDefinitions="Auto,Auto">
+                    <Label Style="{StaticResource Title}" Text="目标步频" />
+                    <Label Grid.Row="1" Style="{StaticResource Hint}" Text="节拍器与提醒的基准（SPM）" />
+                    <Button Grid.RowSpan="2" Grid.Column="1" Command="{Binding DecreaseTargetCommand}" Style="{StaticResource Stepper}" Text="−" />
+                    <Label Grid.RowSpan="2" Grid.Column="2" Style="{StaticResource Value}" Text="{Binding TargetCadence}" />
+                    <Button Grid.RowSpan="2" Grid.Column="3" Command="{Binding IncreaseTargetCommand}" Style="{StaticResource Stepper}" Text="+" />
+                </Grid>
+            </Border>
+
+            <!--  允许偏差  -->
+            <Border Style="{StaticResource Card}">
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto" RowDefinitions="Auto,Auto">
+                    <Label Style="{StaticResource Title}" Text="允许偏差" />
+                    <Label Grid.Row="1" Style="{StaticResource Hint}" Text="超出 ±N SPM 并持续 3 秒才提醒" />
+                    <Button Grid.RowSpan="2" Grid.Column="1" Command="{Binding DecreaseToleranceCommand}" Style="{StaticResource Stepper}" Text="−" />
+                    <Label Grid.RowSpan="2" Grid.Column="2" Style="{StaticResource Value}" Text="{Binding ToleranceSpm}" />
+                    <Button Grid.RowSpan="2" Grid.Column="3" Command="{Binding IncreaseToleranceCommand}" Style="{StaticResource Stepper}" Text="+" />
+                </Grid>
+            </Border>
+
+            <!--  提醒开关  -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="16">
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                        <Label Style="{StaticResource Title}" Text="声音提醒" />
+                        <Label Grid.Row="1" Style="{StaticResource Hint}" Text="提示音，并让节拍过慢升调、过快降调" />
+                        <Switch Grid.RowSpan="2" Grid.Column="1" IsToggled="{Binding AudioAlertEnabled}" OnColor="#4CAF50" VerticalOptions="Center" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                        <Label Style="{StaticResource Title}" Text="震动提醒" />
+                        <Label Grid.Row="1" Style="{StaticResource Hint}" Text="过慢一次长振，过快两次短振" />
+                        <Switch Grid.RowSpan="2" Grid.Column="1" IsToggled="{Binding VibrationAlertEnabled}" OnColor="#4CAF50" VerticalOptions="Center" />
+                    </Grid>
+                </VerticalStackLayout>
+            </Border>
+
+            <Label FontSize="13" Text="{Binding Message}" TextColor="Orange" />
+
+            <Button BackgroundColor="#222222"
+                    Command="{Binding OpenDiagnosticsCommand}"
+                    CornerRadius="8"
+                    FontSize="18"
+                    HeightRequest="56"
+                    Text="诊断"
+                    TextColor="White" />
+        </VerticalStackLayout>
+    </ScrollView>
 
 </ContentView>

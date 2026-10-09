@@ -1,9 +1,12 @@
 ﻿using Android.Content;
 using Android.OS;
 using Runner.Business.Location;
+using Runner.Business.Models;
+using Runner.Business.Platforms.Android.Alerts;
 using Runner.Business.Platforms.Android.Media;
 using Runner.Business.Platforms.Android.Services;
 using Runner.Business.Platforms.Android.StepCounter;
+using Runner.Core.Alerts;
 using Runner.Core.Geolocation;
 using Runner.Core.Session;
 using Runner.Core.SignalProcessing;
@@ -11,7 +14,7 @@ using Runner.Core.SignalProcessing;
 namespace Runner.Business.Platforms.Android.Session;
 
 /// <summary>
-/// 一个 Start / Pause / Stop 驱动 GPS、计步、节拍器与前台服务。
+/// 一个 Start / Pause / Stop 驱动 GPS、计步、节拍器与前台服务，跑动中判定步频偏离并触发提醒。
 /// 来源对象由调用方在权限授予后创建并持有，控制器只在会话期间启停它们；
 /// 单个来源启动失败不终止会话，通过 <see cref="Error"/> 上报。
 /// </summary>
@@ -21,22 +24,26 @@ public sealed class RunSessionController : IDisposable
     private readonly ILocationTracker? _gps;
     private readonly IStepCounter? _steps;
     private readonly CadencePlay _metronome;
+    private readonly CadenceAlertNotifier _alerts;
     private readonly SensorClock _clock = new(SystemClock.ElapsedRealtimeNanos);
     private readonly object _sync = new();
     private Timer? _ticker;
     private RunSession? _session;
+    private CadenceAlertMonitor? _monitor;
 
     /// <summary>指标变化或每秒计时时触发，调用线程不定，订阅方自行切主线程。</summary>
     public event Action? Updated;
     /// <summary>某个来源或前台服务操作失败，会话继续。</summary>
     public event Action<string>? Error;
 
-    public RunSessionController(Context context, ILocationTracker? gps, IStepCounter? steps, CadencePlay metronome)
+    public RunSessionController(Context context, ILocationTracker? gps, IStepCounter? steps,
+        CadencePlay metronome, CadenceAlertNotifier alerts)
     {
         _context = context.ApplicationContext ?? context;
         _gps = gps;
         _steps = steps;
         _metronome = metronome;
+        _alerts = alerts;
         if (_gps != null)
         {
             _gps.OnDistanceUpdated += OnDistance;
@@ -50,24 +57,33 @@ public sealed class RunSessionController : IDisposable
     }
 
     public RunSession? Session => _session;
+    /// <summary>当前步频偏离状态，供界面着色；暂停、结束时为 None。</summary>
+    public CadenceAlertKind AlertState { get; private set; }
     public bool HasGps => _gps != null;
     public bool HasCadenceSource => _steps != null;
     public bool IsActive => _session?.State is RunSessionState.Running or RunSessionState.Paused;
 
-    public async Task StartAsync(int targetCadence)
+    public async Task StartAsync(RunSettings settings)
     {
         RunSession session;
         lock (_sync)
         {
             if (IsActive) throw new InvalidOperationException("会话已在进行中");
             session = new RunSession(_clock);
-            session.Start(targetCadence, cadenceAvailable: _steps != null);
+            session.Start(settings.TargetCadence, cadenceAvailable: _steps != null);
             _session = session;
+            _monitor = new CadenceAlertMonitor(new CadenceAlertConfig
+            {
+                TargetCadence = settings.TargetCadence,
+                ToleranceSpm = settings.ToleranceSpm
+            }, _clock);
+            _alerts.Apply(settings);
         }
+        SetAlertState(CadenceAlertKind.None);
         _gps?.Reset();
         _steps?.Reset();
         Try(StartForegroundService, "前台服务启动");
-        await StartSourcesAsync(targetCadence);
+        await StartSourcesAsync(settings.TargetCadence);
         StartTicker();
         Updated?.Invoke();
     }
@@ -78,7 +94,9 @@ public sealed class RunSessionController : IDisposable
         lock (_sync)
         {
             RequireSession().Pause();
+            _monitor?.Reset();
         }
+        SetAlertState(CadenceAlertKind.None);
         StopSources();
         StopTicker();
         Updated?.Invoke();
@@ -91,6 +109,7 @@ public sealed class RunSessionController : IDisposable
         {
             var session = RequireSession();
             session.Resume();
+            _monitor?.Reset();
             targetCadence = session.TargetCadence;
         }
         await StartSourcesAsync(targetCadence);
@@ -103,7 +122,9 @@ public sealed class RunSessionController : IDisposable
         lock (_sync)
         {
             RequireSession().Stop();
+            _monitor?.Reset();
         }
+        SetAlertState(CadenceAlertKind.None);
         StopSources();
         StopTicker();
         Try(StopForegroundService, "前台服务停止");
@@ -154,6 +175,13 @@ public sealed class RunSessionController : IDisposable
         }
     }
 
+    private void SetAlertState(CadenceAlertKind state)
+    {
+        if (AlertState == state) return;
+        AlertState = state;
+        _alerts.SetState(state);
+    }
+
     private void Try(Action action, string description)
     {
         try { action(); }
@@ -176,7 +204,19 @@ public sealed class RunSessionController : IDisposable
 
     private void OnCadence(double stepsPerMinute)
     {
-        _session?.UpdateCadence(stepsPerMinute);
+        var alert = CadenceAlertKind.None;
+        var state = CadenceAlertKind.None;
+        lock (_sync)
+        {
+            _session?.UpdateCadence(stepsPerMinute);
+            if (_session?.State == RunSessionState.Running && _monitor != null)
+            {
+                alert = _monitor.Evaluate(stepsPerMinute);
+                state = _monitor.State;
+            }
+        }
+        SetAlertState(state);
+        if (alert != CadenceAlertKind.None) _alerts.Notify(alert);
         Updated?.Invoke();
     }
 

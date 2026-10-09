@@ -11,6 +11,42 @@
         <ScrollView>
 
             <VerticalStackLayout Padding="20" Spacing="15" VerticalOptions="Start">
+                <!--  运动会话  -->
+                <Border Padding="15" BackgroundColor="#1E1E1E">
+                    <VerticalStackLayout Spacing="8">
+                        <Label FontAttributes="Bold" FontSize="18" Text="运动会话" TextColor="White" />
+                        <Label Text="{Binding SessionStatus, StringFormat='状态: {0}'}" TextColor="White" />
+                        <Label FontSize="13" Text="{Binding SessionMessage}" TextColor="Orange" />
+                        <Label FontAttributes="Bold" FontSize="40" Text="{Binding SessionElapsed}" TextColor="White" />
+                        <Label FontAttributes="Bold" FontSize="28" Text="{Binding SessionDistanceKm, StringFormat='{}{0:F3} 公里'}" TextColor="White" />
+                        <Label FontAttributes="Bold"
+                               FontSize="28"
+                               IsVisible="{Binding CadenceAvailable}"
+                               Text="{Binding SessionCadence, StringFormat='{}{0:F0} SPM'}"
+                               TextColor="White" />
+                        <Label FontSize="16" Text="{Binding SessionTargetCadence, StringFormat='目标 {0} SPM'}" TextColor="LightGray" />
+                        <Label FontSize="13" Text="{Binding SessionSummary}" TextColor="LightGray" />
+                        <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
+                            <Button Command="{Binding StartSessionCommand}"
+                                    HeightRequest="50"
+                                    Text="开始"
+                                    WidthRequest="75" />
+                            <Button Command="{Binding PauseSessionCommand}"
+                                    HeightRequest="50"
+                                    Text="暂停"
+                                    WidthRequest="75" />
+                            <Button Command="{Binding ResumeSessionCommand}"
+                                    HeightRequest="50"
+                                    Text="继续"
+                                    WidthRequest="75" />
+                            <Button Command="{Binding StopSessionCommand}"
+                                    HeightRequest="50"
+                                    Text="结束"
+                                    WidthRequest="75" />
+                        </HorizontalStackLayout>
+                    </VerticalStackLayout>
+                </Border>
+
                 <!--  媒体控制按钮  -->
                 <Frame Padding="15" BackgroundColor="LightGray">
                     <VerticalStackLayout Spacing="10">

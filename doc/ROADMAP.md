@@ -11,16 +11,16 @@
 | 需求 | 状态 | 说明 |
 |---|---|---|
 | 2.1 硬件计步 → 加速度兜底 | 完成 | `HardwareStepCounter`、`AccelerometerStepCounter`，三轮真机验证，见 `ALGORITHM_VALIDATION.md` |
-| 2.1 无传感器时仅节拍器 | 未做 | `StepCounterFactory` 直接抛异常，节拍器不会接管 |
+| 2.1 无传感器时仅节拍器 | 完成（P1） | `StepCounterFactory.Create` 返回 null，会话进入仅节拍器模式 |
 | GPS 距离 / 速度 | 完成 | 室外已知路线、长时间锁屏、加速度兜底精度尚未实测 |
 | 节拍器 | 骨架 | `CadencePlay` 可用，目标步频写死 180，无设置 |
 | 媒体控制 | 完成 | `MediaController` 发媒体键 |
-| 前台服务 | 骨架 | 授权后即启动，未与跑步会话绑定；`RunnerService.StartBeeping` 为空循环死代码 |
+| 前台服务 | 完成（P1） | 随运动会话起停；`RunnerService.StartBeeping` 为空循环死代码，P6 删除 |
 | 2.2 阈值 / 语音 / 变调 / 震动 / 开关 | 未做 | 无任何实现 |
 | 2.3 地图 | 未做 | 无任何实现 |
 | 3 极简跑步主界面 | 未做 | `MainPage` 为调试面板；底栏四个按钮未绑命令；`AppShell` 空壳 |
 | 4 LiteDB Workouts / Activities / Settings | 未做 | 仅注册了 `AddLiteDbDataAccess`，无实体；`Product`、`User` 为框架示例遗留 |
-| 时长 | 未做 | 无计时 |
+| 时长 | 完成（P1） | `RunSession.Elapsed` 只累计跑动区间 |
 
 ## 设计决定
 
@@ -38,12 +38,13 @@
 
 `Runner.Lib` 纳入解决方案后触发 NU1008：`Runner.Lib.csproj` 去掉内联 `Version`，`Directory.Packages.props` 集中声明 `LiteDB`。
 
-### P1 运动会话 — 未开始
+### P1 运动会话 — 代码完成（2026-10-09），待真机验收
 
-- `Runner.Core.Session.RunSession`：状态机、时长（注入 `TimeProvider`）、距离、步频、目标步频、`TrackPoints`（复用 `GeoCoordinate`）、`CadencePoints`。
-- Business 控制器把 `ILocationTracker`、`IStepCounter`、`CadencePlay`、`RunnerService` 绑到会话；一个 Start / Pause / Stop。
-- 工厂无传感器时返回"无计步"而非抛异常，会话进入仅节拍器模式，隐藏实际步频。
-- 验收：锁屏 10 分钟时长 / 距离 / 步数连续；暂停期间三者不累计；状态机全部迁移有 Core 测试。
+- `Runner.Core.Session`：`RunSession` 状态机（Idle / Running / Paused / Stopped，非法转换抛异常）、时长只累计 Running、距离 / 步数 / 步频 / 轨迹只在 Running 接收，`CadenceSample` 采样；平均步频 = 步数 / 跑动分钟。20 个用例。
+- `RunSessionController`（Business / Android）：一个 Start / Pause / Stop 驱动 GPS、计步、节拍器、前台服务；前台服务随会话起停；单个来源启动失败通过 `Error` 上报，会话继续。
+- `StepCounterFactory.Create` 无传感器时返回 null，会话进入仅节拍器模式（`CadenceAvailable = false`，界面隐藏实际步频）。
+- 主页新增"运动会话"面板作为 P2 之前的临时入口，原诊断面板保留。
+- 待真机验收：锁屏 10 分钟时长 / 距离 / 步数连续；暂停期间三者不累计；GPS 未开启时会话只剩节拍与计步并提示。
 
 ### P2 极简主界面 — 未开始
 

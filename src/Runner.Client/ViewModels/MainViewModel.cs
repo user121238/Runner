@@ -1,4 +1,4 @@
-using _Microsoft.Android.Resource.Designer;
+﻿using _Microsoft.Android.Resource.Designer;
 using CommunityToolkit.Mvvm.Input;
 using DM.Maui.Framework.Abstractions.Navigation;
 using DM.Maui.Framework.Core.Mvvm;
@@ -7,19 +7,24 @@ using Runner.Business.Platforms.Android.StepCounter;
 using Runner.Business.Platforms.Android.Media;
 using Runner.Business.Platforms.Android.Permissions;
 using Runner.Business.Platforms.Android.Location;
+using Runner.Business.Platforms.Android.Session;
 using Runner.Business.Location;
+using Runner.Core.Session;
 
 namespace Runner.Client.ViewModels;
 
 /// <summary>
-/// 主页 ViewModel - 展示框架核心功能
+/// 主页 ViewModel - 运动会话，以及各来源的诊断控制
 /// </summary>
 public partial class MainViewModel : BaseViewModel
 {
+    private const int DefaultTargetCadence = 180;
+
     private readonly CadencePlay _cadencePlay;
     private IStepCounter? _stepCounter;
     private bool _isPedometerActive = false;
     private ILocationTracker? _locationTracker;
+    private RunSessionController? _sessionController;
 
     // 计步器相关属性
     private int _stepCount = 0;
@@ -30,6 +35,16 @@ public partial class MainViewModel : BaseViewModel
     private double _gpsDistance = 0.0;
     private double _gpsSpeed = 0.0;
     private string _gpsStatus = "未启动";
+
+    // 运动会话属性
+    private string _sessionStatus = "等待权限";
+    private string _sessionMessage = "";
+    private string _sessionElapsed = "00:00:00";
+    private double _sessionDistanceKm = 0.0;
+    private double _sessionCadence = 0.0;
+    private int _sessionTargetCadence = DefaultTargetCadence;
+    private string _sessionSummary = "";
+    private bool _cadenceAvailable = true;
 
     public MainViewModel(ILogger<MainViewModel> logger, INavigationService navigation) : base(logger, navigation)
     {
@@ -47,21 +62,17 @@ public partial class MainViewModel : BaseViewModel
         await RequestActivityRecognitionPermission();
         await RequestLocationPermission();
 
-        // location 类型前台服务必须在定位授权后、应用位于前台时启动。
-        if (_locationTracker == null) return;
+        // 前台服务的通知需要此权限；服务本身随运动会话起停。
         try
         {
             await Permissions.RequestAsync<Permissions.PostNotifications>();
-            var activity = Platform.CurrentActivity;
-            if (activity != null)
-                activity.StartForegroundService(new Android.Content.Intent(activity,
-                    typeof(Runner.Business.Platforms.Android.Services.RunnerService)));
         }
         catch (Exception ex)
         {
-            Logger?.LogError(ex, "启动运动前台服务失败");
-            GpsStatus = $"后台服务启动失败: {ex.Message}";
+            Logger?.LogWarning(ex, "请求通知权限失败");
         }
+
+        RebuildSessionController();
     }
 
     private async Task RequestActivityRecognitionPermission()
@@ -114,6 +125,13 @@ public partial class MainViewModel : BaseViewModel
             System.Diagnostics.Debug.WriteLine("[MainViewModel] 调用工厂创建计步器");
             var context = Platform.CurrentActivity!;
             _stepCounter = StepCounterFactory.Create(context);
+
+            if (_stepCounter == null)
+            {
+                PedometerStatus = "设备不支持计步，仅节拍器模式";
+                System.Diagnostics.Debug.WriteLine("[MainViewModel] 无计步传感器，仅节拍器模式");
+                return;
+            }
 
             // 订阅事件
             _stepCounter.OnStepCountChanged += OnStepCountChanged;
@@ -181,7 +199,7 @@ public partial class MainViewModel : BaseViewModel
     [RelayCommand]
     private void StartTick()
     {
-        _cadencePlay.Start(180);
+        _cadencePlay.Start(DefaultTargetCadence);
     }
 
     [RelayCommand]
@@ -189,6 +207,187 @@ public partial class MainViewModel : BaseViewModel
     {
         _cadencePlay.Stop();
     }
+
+    #region 运动会话
+
+    public string SessionStatus
+    {
+        get => _sessionStatus;
+        private set => SetProperty(ref _sessionStatus, value);
+    }
+
+    public string SessionMessage
+    {
+        get => _sessionMessage;
+        private set => SetProperty(ref _sessionMessage, value);
+    }
+
+    public string SessionElapsed
+    {
+        get => _sessionElapsed;
+        private set => SetProperty(ref _sessionElapsed, value);
+    }
+
+    public double SessionDistanceKm
+    {
+        get => _sessionDistanceKm;
+        private set => SetProperty(ref _sessionDistanceKm, value);
+    }
+
+    public double SessionCadence
+    {
+        get => _sessionCadence;
+        private set => SetProperty(ref _sessionCadence, value);
+    }
+
+    public int SessionTargetCadence
+    {
+        get => _sessionTargetCadence;
+        private set => SetProperty(ref _sessionTargetCadence, value);
+    }
+
+    public string SessionSummary
+    {
+        get => _sessionSummary;
+        private set => SetProperty(ref _sessionSummary, value);
+    }
+
+    /// <summary>false 表示无计步来源，界面隐藏实际步频。</summary>
+    public bool CadenceAvailable
+    {
+        get => _cadenceAvailable;
+        private set => SetProperty(ref _cadenceAvailable, value);
+    }
+
+    public bool CanStartSession => _sessionController != null && !_sessionController.IsActive;
+    public bool CanPauseSession => _sessionController?.Session?.CanPause == true;
+    public bool CanResumeSession => _sessionController?.Session?.CanResume == true;
+    public bool CanStopSession => _sessionController?.Session?.CanStop == true;
+
+    /// <summary>来源（GPS / 计步器）创建或切换后重建控制器；会话进行中不重建。</summary>
+    private void RebuildSessionController()
+    {
+        if (_sessionController?.IsActive == true) return;
+
+        if (_sessionController != null)
+        {
+            _sessionController.Updated -= OnSessionUpdated;
+            _sessionController.Error -= OnSessionError;
+            _sessionController.Dispose();
+        }
+
+        _sessionController = new RunSessionController(Platform.AppContext, _locationTracker, _stepCounter, _cadencePlay);
+        _sessionController.Updated += OnSessionUpdated;
+        _sessionController.Error += OnSessionError;
+        CadenceAvailable = _sessionController.HasCadenceSource;
+        RefreshSession();
+    }
+
+    private void OnSessionUpdated() => MainThread.BeginInvokeOnMainThread(RefreshSession);
+
+    private void OnSessionError(string message)
+    {
+        Logger?.LogWarning("运动会话: {Message}", message);
+        MainThread.BeginInvokeOnMainThread(() => SessionMessage = message);
+    }
+
+    private void RefreshSession()
+    {
+        var session = _sessionController?.Session;
+        if (session == null)
+        {
+            SessionStatus = _sessionController == null ? "等待权限" : "未开始";
+            SessionElapsed = "00:00:00";
+            SessionDistanceKm = 0;
+            SessionCadence = 0;
+            SessionTargetCadence = DefaultTargetCadence;
+            SessionSummary = "";
+        }
+        else
+        {
+            SessionStatus = session.State switch
+            {
+                RunSessionState.Running => "跑步中",
+                RunSessionState.Paused => "已暂停",
+                RunSessionState.Stopped => "已结束",
+                _ => "未开始"
+            };
+            SessionElapsed = session.Elapsed.ToString(@"hh\:mm\:ss");
+            SessionDistanceKm = session.DistanceKm;
+            SessionCadence = session.CurrentCadence;
+            SessionTargetCadence = session.TargetCadence;
+            CadenceAvailable = session.CadenceAvailable;
+            SessionSummary = session.CadenceAvailable
+                ? $"平均步频 {session.AverageCadence:F0} · 步数 {session.StepCount} · 均速 {session.AverageSpeedKmh:F1} km/h"
+                : $"均速 {session.AverageSpeedKmh:F1} km/h";
+        }
+
+        StartSessionCommand.NotifyCanExecuteChanged();
+        PauseSessionCommand.NotifyCanExecuteChanged();
+        ResumeSessionCommand.NotifyCanExecuteChanged();
+        StopSessionCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanStartSession))]
+    private async Task StartSessionAsync()
+    {
+        if (_sessionController == null) return;
+        SessionMessage = "";
+        try
+        {
+            await _sessionController.StartAsync(DefaultTargetCadence);
+        }
+        catch (Exception ex)
+        {
+            SessionMessage = $"启动失败: {ex.Message}";
+            Logger?.LogError(ex, "启动运动会话失败");
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanPauseSession))]
+    private void PauseSession()
+    {
+        try
+        {
+            _sessionController?.Pause();
+        }
+        catch (Exception ex)
+        {
+            SessionMessage = $"暂停失败: {ex.Message}";
+            Logger?.LogError(ex, "暂停运动会话失败");
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanResumeSession))]
+    private async Task ResumeSessionAsync()
+    {
+        if (_sessionController == null) return;
+        try
+        {
+            await _sessionController.ResumeAsync();
+        }
+        catch (Exception ex)
+        {
+            SessionMessage = $"继续失败: {ex.Message}";
+            Logger?.LogError(ex, "继续运动会话失败");
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(CanStopSession))]
+    private void StopSession()
+    {
+        try
+        {
+            _sessionController?.Stop();
+        }
+        catch (Exception ex)
+        {
+            SessionMessage = $"结束失败: {ex.Message}";
+            Logger?.LogError(ex, "结束运动会话失败");
+        }
+    }
+
+    #endregion
 
     #region 计步器相关属性
 
@@ -279,51 +478,25 @@ public partial class MainViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    private void SwitchToAccelerometer()
-    {
-        System.Diagnostics.Debug.WriteLine("[MainViewModel] 切换到加速度传感器");
-
-        try
-        {
-            // 停止当前计步器
-            if (_stepCounter != null)
-            {
-                if (_isPedometerActive)
-                {
-                    _stepCounter.Stop();
-                    _isPedometerActive = false;
-                }
-
-                _stepCounter.OnStepCountChanged -= OnStepCountChanged;
-                _stepCounter.OnStepFrequencyChanged -= OnStepFrequencyChanged;
-                _stepCounter.Dispose();
-                _stepCounter = null;
-            }
-
-            // 强制使用加速度传感器
-            StepCounterFactory.ForceAccelerometer = true;
-
-            // 重新创建计步器
-            CreateStepCounter();
-
-            System.Diagnostics.Debug.WriteLine("[MainViewModel] 已切换到加速度传感器");
-        }
-        catch (Exception ex)
-        {
-            PedometerStatus = $"切换失败: {ex.Message}";
-            Logger?.LogError(ex, "切换到加速度传感器失败");
-            System.Diagnostics.Debug.WriteLine($"[MainViewModel] 切换失败: {ex}");
-        }
-    }
+    private void SwitchToAccelerometer() => SwitchStepCounter(forceAccelerometer: true);
 
     [RelayCommand]
-    private void SwitchToHardware()
+    private void SwitchToHardware() => SwitchStepCounter(forceAccelerometer: false);
+
+    private void SwitchStepCounter(bool forceAccelerometer)
     {
-        System.Diagnostics.Debug.WriteLine("[MainViewModel] 切换到硬件传感器");
+        string target = forceAccelerometer ? "加速度传感器" : "硬件传感器";
+        System.Diagnostics.Debug.WriteLine($"[MainViewModel] 切换到{target}");
+
+        if (_sessionController?.IsActive == true)
+        {
+            PedometerStatus = "会话进行中，不能切换传感器";
+            return;
+        }
 
         try
         {
-            // 停止当前计步器
+            // 停止并释放当前计步器
             if (_stepCounter != null)
             {
                 if (_isPedometerActive)
@@ -338,18 +511,16 @@ public partial class MainViewModel : BaseViewModel
                 _stepCounter = null;
             }
 
-            // 使用硬件传感器
-            StepCounterFactory.ForceAccelerometer = false;
-
-            // 重新创建计步器
+            StepCounterFactory.ForceAccelerometer = forceAccelerometer;
             CreateStepCounter();
+            RebuildSessionController();
 
-            System.Diagnostics.Debug.WriteLine("[MainViewModel] 已切换到硬件传感器");
+            System.Diagnostics.Debug.WriteLine($"[MainViewModel] 已切换到{target}");
         }
         catch (Exception ex)
         {
             PedometerStatus = $"切换失败: {ex.Message}";
-            Logger?.LogError(ex, "切换到硬件传感器失败");
+            Logger?.LogError(ex, "切换到{Target}失败", target);
             System.Diagnostics.Debug.WriteLine($"[MainViewModel] 切换失败: {ex}");
         }
     }
@@ -578,6 +749,15 @@ public partial class MainViewModel : BaseViewModel
         {
             base.Dispose(disposing);
             return;
+        }
+
+        // 先结束会话：控制器会停掉来源和前台服务。
+        if (_sessionController != null)
+        {
+            _sessionController.Updated -= OnSessionUpdated;
+            _sessionController.Error -= OnSessionError;
+            _sessionController.Dispose();
+            _sessionController = null;
         }
 
         _cadencePlay?.Dispose();

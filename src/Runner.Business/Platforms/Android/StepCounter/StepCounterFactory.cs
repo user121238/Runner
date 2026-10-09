@@ -16,10 +16,10 @@ namespace Runner.Business.Platforms.Android.StepCounter
         public static bool ForceAccelerometer { get; set; } = false;
 
         /// <summary>
-        /// 创建计步器实例
+        /// 创建计步器实例；设备没有任何计步传感器时返回 null，调用方退化为仅节拍器模式。
         /// </summary>
-        /// <returns>计步器实例</returns>
-        public static IStepCounter Create(Context context)
+        /// <returns>计步器实例，或 null</returns>
+        public static IStepCounter? Create(Context context)
         {
             Debug.WriteLine("[StepCounterFactory] 开始创建计步器");
             Debug.WriteLine($"[StepCounterFactory] 强制使用加速度传感器: {ForceAccelerometer}");
@@ -93,8 +93,8 @@ namespace Runner.Business.Platforms.Android.StepCounter
                 return counter;
             }
 
-            Debug.WriteLine("[StepCounterFactory] 错误: 设备不支持任何计步功能");
-            throw new InvalidOperationException("设备不支持计步功能");
+            Debug.WriteLine("[StepCounterFactory] 设备不支持任何计步功能，退化为仅节拍器模式");
+            return null;
         }
     }
 }

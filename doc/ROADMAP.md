@@ -27,7 +27,7 @@
 - 核心数据结构是运动会话 `RunSession`：状态机 Idle / Running / Paused / Stopped，时长、距离、实时步频、目标步频、轨迹点、步频采样。Activity 记录是会话落盘，Workout 是会话的阶段计划，提醒是会话内实际步频对目标步频的判定。
 - 一个 Start / Pause / Stop 驱动 GPS、计步、节拍器、前台服务；前台服务随会话起停。
 - 可测逻辑放 `Runner.Core`（会话状态机、提醒判定、阶段推进），Android 绑定放 `Runner.Business`，与现有分层一致，直接进现有 MSTest 项目。
-- Client 导航用 Prism.Maui（9.0.537 + Prism.DryIoc.Maui）：根页以 `RegionManager` 区域承载 `ContentView` 切换，需要独立一屏的用 `INavigationService` 推 `ContentPage`，根为 `NavigationPage/MainPage`。VM 继承 `BindableBase`，命令用 CommunityToolkit `[RelayCommand]`。
+- Client 导航用 Prism.Maui（9.0.537 + Prism.DryIoc.Maui）：根页以 `RegionManager` 区域承载 `ContentView` 切换，需要独立一屏的用 `INavigationService` 推 `ContentPage`，根为 `NavigationPage/MainPage`。VM 继承 `BindableBase`，命令用 Prism 的 DelegateCommand / AsyncDelegateCommand，不引入 CommunityToolkit.Mvvm。
 - 持久化复用 `DM.Maui.Framework.Data` 的 `IRepository<T>`、`IUnitOfWork`、`BaseEntity`、`LiteDbRepository<T>`，不自写 LiteDB 层。
 - 地图 v1 用 `GraphicsView` 画轨迹折线：离线、零依赖；保留 `IMapProvider` 作为将来接 SDK 的切换点。真地图目前没有免费可用渠道，不接。
 - 现有调试页保留为设置中的"诊断"入口，不删。

@@ -7,7 +7,8 @@
       "WebSearch",
       "Bash(dotnet new:*)",
       "Bash(Select-String -Pattern \"error|exception|fail\" -Context 2)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "PowerShell(dotnet build *)"
     ],
     "deny": [],
     "ask": []

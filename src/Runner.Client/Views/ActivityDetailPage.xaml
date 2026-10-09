@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage x:Class="Runner.Client.Views.ActivityDetailPage"
+             xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:Runner.Client.ViewModels"
+             Title="{Binding Title}"
+             x:DataType="vm:ActivityDetailPageViewModel"
+             BackgroundColor="Black">
+
+    <ContentPage.Resources>
+        <Style x:Key="Metric" TargetType="Label">
+            <Setter Property="TextColor" Value="White" />
+            <Setter Property="FontAttributes" Value="Bold" />
+            <Setter Property="FontSize" Value="28" />
+            <Setter Property="HorizontalTextAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="Caption" TargetType="Label">
+            <Setter Property="TextColor" Value="#9E9E9E" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="HorizontalTextAlignment" Value="Center" />
+        </Style>
+    </ContentPage.Resources>
+
+    <ScrollView>
+        <VerticalStackLayout Padding="16" Spacing="16">
+            <Label FontSize="14" HorizontalTextAlignment="Center" Text="{Binding WorkoutName}" TextColor="#4CAF50" />
+
+            <GraphicsView Drawable="{Binding Trajectory}" HeightRequest="320" />
+
+            <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="18">
+                <VerticalStackLayout Spacing="2">
+                    <Label Style="{StaticResource Metric}" Text="{Binding Distance}" />
+                    <Label Style="{StaticResource Caption}" Text="公里" />
+                </VerticalStackLayout>
+                <VerticalStackLayout Grid.Column="1" Spacing="2">
+                    <Label Style="{StaticResource Metric}" Text="{Binding Duration}" />
+                    <Label Style="{StaticResource Caption}" Text="时长" />
+                </VerticalStackLayout>
+                <VerticalStackLayout Grid.Column="2" Spacing="2">
+                    <Label Style="{StaticResource Metric}" Text="{Binding AverageSpeed}" />
+                    <Label Style="{StaticResource Caption}" Text="均速 km/h" />
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Grid.Row="1" Spacing="2">
+                    <Label Style="{StaticResource Metric}" Text="{Binding AverageCadence}" />
+                    <Label Style="{StaticResource Caption}" Text="均步频 SPM" />
+                </VerticalStackLayout>
+                <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2">
+                    <Label Style="{StaticResource Metric}" Text="{Binding StepCount}" />
+                    <Label Style="{StaticResource Caption}" Text="步数" />
+                </VerticalStackLayout>
+                <VerticalStackLayout Grid.Row="1" Grid.Column="2" Spacing="2">
+                    <Label Style="{StaticResource Metric}" Text="{Binding TrackPointCount}" />
+                    <Label Style="{StaticResource Caption}" Text="轨迹点" />
+                </VerticalStackLayout>
+            </Grid>
+
+            <Label FontSize="13" HorizontalTextAlignment="Center" Text="{Binding TimeRange}" TextColor="#9E9E9E" />
+            <Label FontSize="14" HorizontalTextAlignment="Center" Text="{Binding Message}" TextColor="Orange" />
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

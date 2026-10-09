@@ -6,9 +6,45 @@
              x:DataType="vm:HistoryViewModel"
              BackgroundColor="Black">
 
-    <VerticalStackLayout Padding="24" Spacing="8" VerticalOptions="Center">
-        <Label FontSize="22" HorizontalTextAlignment="Center" Text="还没有跑步记录" TextColor="White" />
-        <Label FontSize="14" HorizontalTextAlignment="Center" Text="结束一次跑步后会出现在这里" TextColor="#9E9E9E" />
-    </VerticalStackLayout>
+    <Grid Padding="24,40,24,16" RowDefinitions="Auto,*,Auto" RowSpacing="12">
+        <Label FontSize="22" Text="记录" TextColor="White" />
+
+        <CollectionView Grid.Row="1" ItemsSource="{Binding Items}" SelectionMode="None">
+            <CollectionView.EmptyView>
+                <VerticalStackLayout Spacing="8" VerticalOptions="Center">
+                    <Label FontSize="22" HorizontalTextAlignment="Center" Text="还没有跑步记录" TextColor="White" />
+                    <Label FontSize="14" HorizontalTextAlignment="Center" Text="结束一次跑步（至少 5 秒）后会出现在这里" TextColor="#9E9E9E" />
+                </VerticalStackLayout>
+            </CollectionView.EmptyView>
+            <CollectionView.ItemTemplate>
+                <DataTemplate x:DataType="vm:ActivityListItem">
+                    <Border Margin="0,0,0,10"
+                            Padding="16"
+                            BackgroundColor="#1E1E1E"
+                            StrokeShape="RoundRectangle 12"
+                            StrokeThickness="0">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:HistoryViewModel}}, Path=OpenCommand}" CommandParameter="{Binding .}" />
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <VerticalStackLayout Spacing="2" VerticalOptions="Center">
+                                <Label FontAttributes="Bold" FontSize="17" Text="{Binding Title}" TextColor="White" />
+                                <Label FontSize="13" Text="{Binding Summary}" TextColor="#9E9E9E" />
+                            </VerticalStackLayout>
+                            <Button Grid.Column="1"
+                                    BackgroundColor="#B71C1C"
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type vm:HistoryViewModel}}, Path=DeleteCommand}"
+                                    CommandParameter="{Binding .}"
+                                    CornerRadius="8"
+                                    Text="删除"
+                                    TextColor="White" />
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+        <Label Grid.Row="2" FontSize="13" Text="{Binding Message}" TextColor="Orange" />
+    </Grid>
 
 </ContentView>

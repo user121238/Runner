@@ -38,7 +38,8 @@ public class RunViewModel : BindableBase, IRegionAware
         PrimaryCommand = new AsyncDelegateCommand(PrimaryAsync, () => CanPrimary);
         StopCommand = new DelegateCommand(Stop, () => CanStop);
         _host.Updated += OnHostUpdated;
-        _host.Error += OnHostError;
+        _host.Error += OnHostMessage;
+        _host.Notice += OnHostMessage;
         _host.Workouts.Changed += OnWorkoutsChanged;
     }
 
@@ -67,6 +68,7 @@ public class RunViewModel : BindableBase, IRegionAware
         {
             if (!SetProperty(ref _selectedWorkoutIndex, value) || _loadingChoices) return;
             _host.SelectedWorkout = value > 0 && value - 1 < _plans.Count ? _plans[value - 1] : null;
+            _host.PreferredWorkoutId = _host.SelectedWorkout?.Id ?? 0;
             Refresh();
         }
     }
@@ -99,7 +101,7 @@ public class RunViewModel : BindableBase, IRegionAware
         try
         {
             var plans = await _host.Workouts.GetAllAsync();
-            int keepId = _host.SelectedWorkout?.Id ?? 0;
+            int keepId = _host.SelectedWorkout?.Id ?? _host.PreferredWorkoutId;
 
             _loadingChoices = true;
             _plans = plans;
@@ -166,7 +168,7 @@ public class RunViewModel : BindableBase, IRegionAware
 
     private void OnHostUpdated() => MainThread.BeginInvokeOnMainThread(Refresh);
 
-    private void OnHostError(string message) => MainThread.BeginInvokeOnMainThread(() => Message = message);
+    private void OnHostMessage(string message) => MainThread.BeginInvokeOnMainThread(() => Message = message);
 
     private void Refresh()
     {

@@ -32,6 +32,8 @@ public sealed class RunSessionController : IDisposable
     public event Action? Updated;
     /// <summary>某个来源或前台服务操作失败，会话继续。</summary>
     public event Action<string>? Error;
+    /// <summary>会话结束、来源已停后触发，供落盘记录。</summary>
+    public event Action<RunSession, WorkoutRunner?>? Stopped;
 
     public RunSessionController(Context context, ILocationTracker? gps, IStepCounter? steps, CadencePlay metronome)
     {
@@ -117,14 +119,17 @@ public sealed class RunSessionController : IDisposable
 
     public void Stop()
     {
+        RunSession session;
         lock (_sync)
         {
-            RequireSession().Stop();
+            session = RequireSession();
+            session.Stop();
         }
         StopSources();
         StopTicker();
         Try(StopForegroundService, "前台服务停止");
         Updated?.Invoke();
+        Stopped?.Invoke(session, _workout);
     }
 
     private RunSession RequireSession() => _session ?? throw new InvalidOperationException("没有进行中的会话");
@@ -261,5 +266,6 @@ public sealed class RunSessionController : IDisposable
         }
         Updated = null;
         Error = null;
+        Stopped = null;
     }
 }

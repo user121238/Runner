@@ -4,18 +4,23 @@ using Runner.Business.Platforms.Android.Location;
 using Runner.Business.Platforms.Android.Media;
 using Runner.Business.Platforms.Android.Permissions;
 using Runner.Business.Platforms.Android.StepCounter;
+using Runner.Business.Services.Activities;
 using Runner.Business.Services.Workouts;
+using Runner.Core.Activities;
+using Runner.Core.Session;
 using Runner.Core.Workouts;
 using MauiPermissions = Microsoft.Maui.ApplicationModel.Permissions;
 
 namespace Runner.Business.Platforms.Android.Session;
 
 /// <summary>
-/// 应用级单例：申请权限、创建并持有 GPS / 计步 / 节拍器来源和会话控制器，记住当前选中的课程。
-/// 页面只消费它，不各自创建监听器。
+/// 应用级单例：申请权限、创建并持有 GPS / 计步 / 节拍器来源和会话控制器，
+/// 记住当前选中的课程，会话结束后把记录落盘。页面只消费它，不各自创建监听器。
 /// </summary>
 public sealed class RunSessionHost : IDisposable
 {
+    private const string PreferredWorkoutKey = "workout.selected";
+
     private readonly int _tickSoundResourceId;
     private readonly ILogger<RunSessionHost> _logger;
     private readonly CadencePlay _metronome = new();
@@ -27,17 +32,29 @@ public sealed class RunSessionHost : IDisposable
     /// <summary>会话指标变化、来源重建或状态文本变化时触发，调用线程不定。</summary>
     public event Action? Updated;
     public event Action<string>? Error;
+    /// <summary>需要给用户看一眼的提示，如记录已保存。</summary>
+    public event Action<string>? Notice;
 
-    public RunSessionHost(int tickSoundResourceId, WorkoutStore workouts, ILogger<RunSessionHost> logger)
+    public RunSessionHost(int tickSoundResourceId, WorkoutStore workouts, ActivityStore activities, ILogger<RunSessionHost> logger)
     {
         _tickSoundResourceId = tickSoundResourceId;
         Workouts = workouts;
+        Activities = activities;
         _logger = logger;
     }
 
     public WorkoutStore Workouts { get; }
+    public ActivityStore Activities { get; }
     /// <summary>首页选中的课程；null 为自由跑。</summary>
     public WorkoutPlan? SelectedWorkout { get; set; }
+
+    /// <summary>上次选中的课程 Id，跨启动保留；0 为自由跑。</summary>
+    public int PreferredWorkoutId
+    {
+        get => Preferences.Default.Get(PreferredWorkoutKey, 0);
+        set => Preferences.Default.Set(PreferredWorkoutKey, value);
+    }
+
     public bool IsInitialized => _controller != null;
     public RunSessionController? Controller => _controller;
     public IStepCounter? StepCounter => _stepCounter;
@@ -139,12 +156,14 @@ public sealed class RunSessionHost : IDisposable
         {
             _controller.Updated -= OnControllerUpdated;
             _controller.Error -= OnControllerError;
+            _controller.Stopped -= OnSessionStopped;
             _controller.Dispose();
         }
 
         _controller = new RunSessionController(Platform.AppContext, _locationTracker, _stepCounter, _metronome);
         _controller.Updated += OnControllerUpdated;
         _controller.Error += OnControllerError;
+        _controller.Stopped += OnSessionStopped;
         Updated?.Invoke();
     }
 
@@ -154,6 +173,26 @@ public sealed class RunSessionHost : IDisposable
     {
         _logger.LogWarning("运动会话: {Message}", message);
         Error?.Invoke(message);
+    }
+
+    private void OnSessionStopped(RunSession session, WorkoutRunner? workout)
+    {
+        if (!ActivityRecord.ShouldRecord(session)) return;
+        _ = SaveActivityAsync(ActivityRecord.FromSession(session, workout?.Name));
+    }
+
+    private async Task SaveActivityAsync(ActivityRecord record)
+    {
+        try
+        {
+            await Activities.SaveAsync(record);
+            Notice?.Invoke("记录已保存");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "保存记录失败");
+            Error?.Invoke($"保存记录失败: {ex.Message}");
+        }
     }
 
     private void DisposeStepCounter()
@@ -168,6 +207,7 @@ public sealed class RunSessionHost : IDisposable
         {
             _controller.Updated -= OnControllerUpdated;
             _controller.Error -= OnControllerError;
+            _controller.Stopped -= OnSessionStopped;
             _controller.Dispose();
             _controller = null;
         }
@@ -177,5 +217,6 @@ public sealed class RunSessionHost : IDisposable
         _metronome.Dispose();
         Updated = null;
         Error = null;
+        Notice = null;
     }
 }

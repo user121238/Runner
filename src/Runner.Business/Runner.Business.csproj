@@ -14,7 +14,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Maui.Controls"  />
-		<PackageReference Include="LiteDB" />
+		<PackageReference Include="DM.Maui.Framework.Abstractions" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -9,10 +9,10 @@
              NavigationPage.HasNavigationBar="False">
 
     <Grid RowDefinitions="*,64">
-        <!--  首页 / 记录 / 设置 在此区域内切换  -->
+        <!--  首页 / 课程 / 记录 / 设置 在此区域内切换  -->
         <ContentView regions:RegionManager.RegionName="MainRegion" />
 
-        <Grid Grid.Row="1" BackgroundColor="#111111" ColumnDefinitions="*,*,*">
+        <Grid Grid.Row="1" BackgroundColor="#111111" ColumnDefinitions="*,*,*,*">
             <Button BackgroundColor="Transparent"
                     Command="{Binding NavigateCommand}"
                     CommandParameter="RunView"
@@ -23,12 +23,20 @@
             <Button Grid.Column="1"
                     BackgroundColor="Transparent"
                     Command="{Binding NavigateCommand}"
+                    CommandParameter="WorkoutsView"
+                    CornerRadius="0"
+                    FontSize="16"
+                    Text="课程"
+                    TextColor="White" />
+            <Button Grid.Column="2"
+                    BackgroundColor="Transparent"
+                    Command="{Binding NavigateCommand}"
                     CommandParameter="HistoryView"
                     CornerRadius="0"
                     FontSize="16"
                     Text="记录"
                     TextColor="White" />
-            <Button Grid.Column="2"
+            <Button Grid.Column="3"
                     BackgroundColor="Transparent"
                     Command="{Binding NavigateCommand}"
                     CommandParameter="SettingsView"

@@ -56,14 +56,42 @@ public sealed class RunSessionTests
     }
 
     [TestMethod]
-    [DataRow(0)]
-    [DataRow(-1)]
-    public void Start_NonPositiveTargetCadence_Throws(int targetCadence)
+    public void Start_NegativeTargetCadence_Throws()
     {
         var session = new RunSession(_clock);
 
-        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => session.Start(targetCadence));
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => session.Start(-1));
         Assert.AreEqual(RunSessionState.Idle, session.State);
+    }
+
+    [TestMethod]
+    public void Start_ZeroTargetCadence_MeansNoTarget()
+    {
+        var session = new RunSession(_clock);
+
+        session.Start(0);
+
+        Assert.AreEqual(0, session.TargetCadence);
+        Assert.AreEqual(RunSessionState.Running, session.State);
+    }
+
+    [TestMethod]
+    public void SetTargetCadence_UpdatesWhileActiveAndRejectsAfterStop()
+    {
+        var session = StartedSession();
+
+        session.SetTargetCadence(170);
+        Assert.AreEqual(170, session.TargetCadence);
+
+        session.Pause();
+        session.SetTargetCadence(0);
+        Assert.AreEqual(0, session.TargetCadence);
+
+        Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => session.SetTargetCadence(-5));
+        Assert.AreEqual(0, session.TargetCadence);
+
+        session.Stop();
+        Assert.ThrowsExactly<InvalidOperationException>(() => session.SetTargetCadence(180));
     }
 
     [TestMethod]

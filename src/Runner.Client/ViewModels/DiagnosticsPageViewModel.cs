@@ -11,6 +11,7 @@ namespace Runner.Client.ViewModels;
 /// <summary>诊断页：逐个来源单独起停，真机排障用。来源实例来自 RunSessionHost，不自建。</summary>
 public class DiagnosticsPageViewModel : BindableBase, IDestructible
 {
+    private const int MetronomeCadence = 180;
     private readonly RunSessionHost _host;
     private IStepCounter? _stepCounter;
     private ILocationTracker? _locationTracker;
@@ -30,7 +31,7 @@ public class DiagnosticsPageViewModel : BindableBase, IDestructible
         NextTrackCommand = new DelegateCommand(() => MediaController.NextTrack(Platform.AppContext));
         PreviousTrackCommand = new DelegateCommand(() => MediaController.PreviousTrack(Platform.AppContext));
         PlayPauseCommand = new DelegateCommand(() => MediaController.PlayPause(Platform.AppContext));
-        StartTickCommand = new DelegateCommand(() => _host.Metronome.Start(_host.Settings.Current.TargetCadence));
+        StartTickCommand = new DelegateCommand(() => _host.Metronome.Start(MetronomeCadence));
         StopTickCommand = new DelegateCommand(_host.Metronome.Stop);
         StartPedometerCommand = new DelegateCommand(StartPedometer);
         StopPedometerCommand = new DelegateCommand(StopPedometer);

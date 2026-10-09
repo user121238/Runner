@@ -77,7 +77,7 @@ public sealed class RunSession
 
     public void Start(int targetCadence, bool cadenceAvailable = true)
     {
-        if (targetCadence <= 0) throw new ArgumentOutOfRangeException(nameof(targetCadence));
+        if (targetCadence < 0) throw new ArgumentOutOfRangeException(nameof(targetCadence));
         lock (_lock)
         {
             Require(CanStart, nameof(Start));
@@ -119,6 +119,17 @@ public sealed class RunSession
             CurrentCadence = 0;
             EndTime = _clock.GetUtcNow();
             State = RunSessionState.Stopped;
+        }
+    }
+
+    /// <summary>更新目标步频（课程阶段切换时）；0 表示无目标。结束后不可改。</summary>
+    public void SetTargetCadence(int targetCadence)
+    {
+        if (targetCadence < 0) throw new ArgumentOutOfRangeException(nameof(targetCadence));
+        lock (_lock)
+        {
+            Require(State != RunSessionState.Stopped, nameof(SetTargetCadence));
+            TargetCadence = targetCadence;
         }
     }
 

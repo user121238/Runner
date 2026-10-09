@@ -13,22 +13,22 @@
 | 2.1 硬件计步 → 加速度兜底 | 完成 | `HardwareStepCounter`、`AccelerometerStepCounter`，三轮真机验证，见 `ALGORITHM_VALIDATION.md` |
 | 2.1 无传感器时仅节拍器 | 完成（P1） | `StepCounterFactory.Create` 返回 null，会话进入仅节拍器模式 |
 | GPS 距离 / 速度 | 完成 | 室外已知路线、长时间锁屏、加速度兜底精度尚未实测 |
-| 节拍器 | 完成（P3） | 目标步频来自设置，支持变调与提示音 |
+| 节拍器 | 完成（P4 课程） | 目标步频来自课程阶段，0 = 不播；自由跑不播 |
 | 媒体控制 | 完成 | `MediaController` 发媒体键 |
 | 前台服务 | 完成（P1） | 随运动会话起停；`RunnerService.StartBeeping` 为空循环死代码，P6 删除 |
-| 2.2 阈值 / 语音 / 变调 / 震动 / 开关 | 完成（P3，语音未做） | 阈值与开关可设；提示音 + 节拍变调 + 震动；语音 TTS 待做 |
+| 2.2 阈值 / 语音 / 变调 / 震动 / 开关 | 不做（用户决定） | 步频偏离提醒已撤回；提醒改为课程节点切歌 |
 | 2.3 地图 | 未做 | 无任何实现 |
 | 3 极简跑步主界面 | 完成（P2） | `RunView` 四个大数字 + 主按钮；底栏在 Prism 区域内切换首页 / 记录 / 设置；诊断页独立 |
-| 4 LiteDB Workouts / Activities / Settings | 部分（P3 完成 Settings） | `RunSettings` 已入库；Activities / Workouts 在 P4；`Product`、`User` 为框架示例遗留 |
+| 4 LiteDB Workouts / Activities / Settings | 部分（课程完成） | `WorkoutPlan` 走 DM `IRepository<T>`；Activities 待做；Settings 不再需要；`Product`、`User` 为框架示例遗留 |
 | 时长 | 完成（P1） | `RunSession.Elapsed` 只累计跑动区间 |
 
 ## 设计决定
 
-- 核心数据结构是运动会话 `RunSession`：状态机 Idle / Running / Paused / Stopped，时长、距离、实时步频、目标步频、轨迹点、步频采样。Activity 记录是会话落盘，Workout 是会话的阶段计划，提醒是会话内实际步频对目标步频的判定。
+- 核心数据结构是运动会话 `RunSession`：状态机 Idle / Running / Paused / Stopped，时长、距离、实时步频、目标步频、轨迹点、步频采样。Activity 记录是会话落盘，课程（`WorkoutPlan`）是会话上的阶段计划，推进器只读会话的时长与距离。
 - 一个 Start / Pause / Stop 驱动 GPS、计步、节拍器、前台服务；前台服务随会话起停。
-- 可测逻辑放 `Runner.Core`（会话状态机、提醒判定、阶段推进），Android 绑定放 `Runner.Business`，与现有分层一致，直接进现有 MSTest 项目。
+- 可测逻辑放 `Runner.Core`（会话状态机、课程推进），Android 绑定放 `Runner.Business`，与现有分层一致，直接进现有 MSTest 项目。
 - Client 导航用 Prism.Maui（9.0.537 + Prism.DryIoc.Maui）：根页以 `RegionManager` 区域承载 `ContentView` 切换，需要独立一屏的用 `INavigationService` 推 `ContentPage`，根为 `NavigationPage/MainPage`。VM 继承 `BindableBase`，命令用 Prism 的 DelegateCommand / AsyncDelegateCommand，不引入 CommunityToolkit.Mvvm。
-- 设置存储直接用框架注册的单例 `ILiteDatabase`（`RunSettingsStore`），不经 `IUnitOfWork`：后者是作用域生命周期，应用级单例拿不到。P4 的记录若要走 `IRepository<T>`，需要 DM 补开放泛型注册。
+- 持久化走 DM 的 `IRepository<T>`：DM 1.0.4 起 `AddLiteDbDataAccess` 注册开放泛型 `IRepository<>` 单例，应用级单例可直接注入；框架随需求演进（源码 `D:\Eric\Code\DM.Maui.Framework`，Release 构建自动打包到 LocalNuGet）。
 - 持久化复用 `DM.Maui.Framework.Data` 的 `IRepository<T>`、`IUnitOfWork`、`BaseEntity`、`LiteDbRepository<T>`，不自写 LiteDB 层。
 - 地图 v1 用 `GraphicsView` 画轨迹折线：离线、零依赖；保留 `IMapProvider` 作为将来接 SDK 的切换点。真地图目前没有免费可用渠道，不接。
 - 现有调试页保留为设置中的"诊断"入口，不删。
@@ -57,20 +57,24 @@
 - DM.Maui.Framework.Core 的 Shell / 导航只为冻结的手表页面保留编译；DM.Data 继续用。
 - 真机：Debug 包已安装并启动无崩溃（包名实际为 Manifest 的 `com.eric.runner`，非 csproj 的 ApplicationId）；当时手机锁屏且 MIUI 拒绝 adb 注入按键，界面截图待解锁后补。
 
-### P3 设置与提醒 — 代码完成（2026-10-09），待真机验收
+### P3 设置与提醒 — 已撤回（2026-10-09）
 
-- `Runner.Core.Alerts`：`CadenceAlertMonitor` 判定偏离——|实际 − 目标| 超容差且持续 3 秒才提醒，持续偏离每 10 秒重复；容差 − 回滞（3 SPM）内才算恢复，反向偏离需超完整容差；步频 0 视为无数据。18 个用例。
-- `RunSettings`（目标步频 100–240、允许偏差 2–40、声音 / 震动开关）由 `RunSettingsStore` 持有并写入 LiteDB；直接用框架注册的单例 `ILiteDatabase`，因为框架的 `IUnitOfWork` 是作用域生命周期，应用级单例拿不到。
-- 输出：`CadencePlay` 加载 beep1 / beep2 作过慢 / 过快提示音，节拍过慢升调（1.2×）、过快降调（0.85×）；`AndroidVibrator` 过慢一次长振、过快两次短振；`CadenceAlertNotifier` 按开关分发。Manifest 加 `VIBRATE`。
-- `RunSessionController.StartAsync(RunSettings)`：用设置的目标步频起节拍器并建判定器；暂停 / 结束重置判定；`AlertState` 供首页步频着色（过慢橙、过快红）。
-- 设置页：目标步频 ±5、允许偏差 ±1、两个开关，改动即保存，首页目标步频随之刷新。
-- 未做：语音提示（TTS），按路线图最后做。真机验收：偏离 3 秒后提示音与震动、节拍变调、开关生效。
+用户决定不做步频偏离提醒，也不在设置里设目标步频：`Runner.Core.Alerts`、提示音 / 变调 / 震动输出、`RunSettings` 与设置页里的相关项全部删除（实现见提交 afd9ada，随后回退）。步频改为由课程阶段定义，提醒改为课程节点切歌。
 
-### P4 记录与计划 — 未开始
+### P4 课程与记录
+
+#### 课程 — 代码完成（2026-10-09），待真机验收
+
+- `Runner.Core.Workouts`：`WorkoutPlan`（名称、轮数、阶段列表）、`WorkoutStage`（步频 0–300，0 = 不播节拍；结束条件 时长秒 / 距离米 二选一；进入时是否切歌）、`WorkoutRunner` 用会话的跑动时长与距离推进阶段——边界按计划值累加不带入采样延迟，一次更新可跨多阶段，轮次展开。11 个用例。
+- 持久化：`WorkoutStore` 走 DM 的 `IRepository<WorkoutPlan>`；DM 1.0.4 在 `AddLiteDbDataAccess` 里补了开放泛型 `IRepository<>` 单例注册（`LiteDbRepository<T>` 只持有共享模式的单例 `ILiteDatabase`）。
+- 会话：`RunSessionController.StartAsync(WorkoutPlan?)`，进入阶段时按步频起停节拍器、按需 `MediaController.NextTrack` 切歌；课程完成停节拍，会话继续；自由跑不播节拍。
+- 界面：底栏加「课程」；课程列表（新建 / 编辑 / 删除，删除前确认）与编辑页（名称、轮数、阶段：步频、时长分钟 / 距离米、切歌开关）；首页空闲时选课程或自由跑，进行中显示「课程 · 第 r/R 轮 · 阶段 i/n · 剩 x」。
+- 真机验收：法特莱克（2 分钟 180 / 1 分钟 120 切歌 × N 轮）节点准时切节拍与切歌；暂停不计入阶段时长；距离阶段按 GPS 距离推进。
+
+#### 记录 — 未开始
 
 - `Activity : BaseEntity`（StartTime、EndTime、TotalDistance、AverageCadence、TrackPoints、CadencePoints），Stop 时落盘；删除 `Product`、`User`。
-- `Workout : BaseEntity`（阶段：时长、目标步频、AutoNextTrack）；阶段推进逻辑放 Core，`AutoNextTrack` 调 `MediaController.NextTrack`。
-- 记录页：列表 + 详情；计划页：编辑与执行。
+- 记录页：列表 + 详情。
 
 ### P5 轨迹图 — 未开始
 

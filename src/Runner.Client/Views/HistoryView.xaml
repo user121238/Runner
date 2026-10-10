@@ -4,47 +4,65 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:Runner.Client.ViewModels"
              x:DataType="vm:HistoryViewModel"
-             BackgroundColor="Black">
+             BackgroundColor="{StaticResource Bg}">
 
-    <Grid Padding="24,40,24,16" RowDefinitions="Auto,*,Auto" RowSpacing="12">
-        <Label FontSize="22" Text="记录" TextColor="White" />
+    <Grid Padding="20,10,20,14" RowDefinitions="Auto,*,Auto" RowSpacing="14">
+        <Label Style="{StaticResource PageTitle}" Text="记录" />
 
-        <CollectionView Grid.Row="1" ItemsSource="{Binding Items}" SelectionMode="None">
+        <CollectionView Grid.Row="1"
+                        ItemsSource="{Binding Items}"
+                        SelectionMode="None"
+                        VerticalScrollBarVisibility="Never">
             <CollectionView.EmptyView>
-                <VerticalStackLayout Spacing="8" VerticalOptions="Center">
-                    <Label FontSize="22" HorizontalTextAlignment="Center" Text="还没有跑步记录" TextColor="White" />
-                    <Label FontSize="14" HorizontalTextAlignment="Center" Text="结束一次跑步（至少 5 秒）后会出现在这里" TextColor="#9E9E9E" />
+                <VerticalStackLayout HorizontalOptions="Center" Spacing="10" VerticalOptions="Center">
+                    <Image HeightRequest="48"
+                           HorizontalOptions="Center"
+                           Opacity="0.7"
+                           Source="icon_history.png"
+                           WidthRequest="48" />
+                    <Label HorizontalTextAlignment="Center" Style="{StaticResource CardTitle}" Text="还没有跑步记录" />
+                    <Label HorizontalTextAlignment="Center" Style="{StaticResource Hint}" Text="结束一次跑步（跑动至少 5 秒）后会出现在这里" />
                 </VerticalStackLayout>
             </CollectionView.EmptyView>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="vm:ActivityListItem">
-                    <Border Margin="0,0,0,10"
-                            Padding="16"
-                            BackgroundColor="#1E1E1E"
-                            StrokeShape="RoundRectangle 12"
-                            StrokeThickness="0">
+                    <Border Margin="0,0,0,10" Style="{StaticResource Card}">
                         <Border.GestureRecognizers>
                             <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:HistoryViewModel}}, Path=OpenCommand}" CommandParameter="{Binding .}" />
                         </Border.GestureRecognizers>
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                            <VerticalStackLayout Spacing="2" VerticalOptions="Center">
-                                <Label FontAttributes="Bold" FontSize="17" Text="{Binding Title}" TextColor="White" />
-                                <Label FontSize="13" Text="{Binding Summary}" TextColor="#9E9E9E" />
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="14">
+                            <VerticalStackLayout MinimumWidthRequest="72" Spacing="0" VerticalOptions="Center">
+                                <Label FontFamily="OpenSansSemibold"
+                                       FontSize="28"
+                                       Text="{Binding Distance}"
+                                       TextColor="{StaticResource TextPrimary}" />
+                                <Label Style="{StaticResource Caption}" Text="公里" />
                             </VerticalStackLayout>
-                            <Button Grid.Column="1"
-                                    BackgroundColor="#B71C1C"
+                            <VerticalStackLayout Grid.Column="1" Spacing="4" VerticalOptions="Center">
+                                <Label Style="{StaticResource Body}" Text="{Binding Date}" />
+                                <Label Style="{StaticResource CardDetail}" Text="{Binding Detail}" />
+                                <Border HorizontalOptions="Start" IsVisible="{Binding HasWorkout}" Style="{StaticResource Tag}">
+                                    <Label FontSize="11" Text="{Binding WorkoutName}" TextColor="{StaticResource Accent}" />
+                                </Border>
+                            </VerticalStackLayout>
+                            <Button Grid.Column="2"
                                     Command="{Binding Source={RelativeSource AncestorType={x:Type vm:HistoryViewModel}}, Path=DeleteCommand}"
                                     CommandParameter="{Binding .}"
-                                    CornerRadius="8"
+                                    Style="{StaticResource GhostDangerButton}"
                                     Text="删除"
-                                    TextColor="White" />
+                                    VerticalOptions="Center" />
                         </Grid>
                     </Border>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>
 
-        <Label Grid.Row="2" FontSize="13" Text="{Binding Message}" TextColor="Orange" />
+        <Label Grid.Row="2"
+               HorizontalTextAlignment="Center"
+               IsVisible="{Binding HasMessage}"
+               Style="{StaticResource Caption}"
+               Text="{Binding Message}"
+               TextColor="{StaticResource Warn}" />
     </Grid>
 
 </ContentView>

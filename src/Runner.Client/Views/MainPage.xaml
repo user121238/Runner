@@ -5,46 +5,114 @@
              xmlns:regions="clr-namespace:Prism.Navigation.Regions.Xaml;assembly=Prism.Maui"
              xmlns:vm="clr-namespace:Runner.Client.ViewModels"
              x:DataType="vm:MainPageViewModel"
-             BackgroundColor="Black"
+             BackgroundColor="{StaticResource Bg}"
              NavigationPage.HasNavigationBar="False">
 
-    <Grid RowDefinitions="*,64">
+    <ContentPage.Resources>
+        <Style x:Key="TabItem" TargetType="Grid">
+            <Setter Property="BackgroundColor" Value="Transparent" />
+            <Setter Property="RowSpacing" Value="3" />
+            <Setter Property="Padding" Value="0,8,0,6" />
+        </Style>
+        <Style x:Key="TabIcon" TargetType="Image">
+            <Setter Property="HeightRequest" Value="24" />
+            <Setter Property="WidthRequest" Value="24" />
+            <Setter Property="HorizontalOptions" Value="Center" />
+            <Setter Property="VerticalOptions" Value="Center" />
+        </Style>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="*,Auto">
         <!--  首页 / 课程 / 记录 / 设置 在此区域内切换  -->
         <ContentView regions:RegionManager.RegionName="MainRegion" />
 
-        <Grid Grid.Row="1" BackgroundColor="#111111" ColumnDefinitions="*,*,*,*">
-            <Button BackgroundColor="Transparent"
-                    Command="{Binding NavigateCommand}"
-                    CommandParameter="RunView"
-                    CornerRadius="0"
-                    FontSize="16"
-                    Text="首页"
-                    TextColor="White" />
-            <Button Grid.Column="1"
-                    BackgroundColor="Transparent"
-                    Command="{Binding NavigateCommand}"
-                    CommandParameter="WorkoutsView"
-                    CornerRadius="0"
-                    FontSize="16"
-                    Text="课程"
-                    TextColor="White" />
-            <Button Grid.Column="2"
-                    BackgroundColor="Transparent"
-                    Command="{Binding NavigateCommand}"
-                    CommandParameter="HistoryView"
-                    CornerRadius="0"
-                    FontSize="16"
-                    Text="记录"
-                    TextColor="White" />
-            <Button Grid.Column="3"
-                    BackgroundColor="Transparent"
-                    Command="{Binding NavigateCommand}"
-                    CommandParameter="SettingsView"
-                    CornerRadius="0"
-                    FontSize="16"
-                    Text="设置"
-                    TextColor="White" />
-        </Grid>
+        <!--  底栏：图标 + 文字，选中态荧光绿；整格可点  -->
+        <VerticalStackLayout Grid.Row="1" BackgroundColor="{StaticResource Bg}">
+            <BoxView BackgroundColor="{StaticResource Line}" HeightRequest="1" />
+            <Grid ColumnDefinitions="*,*,*,*">
+
+                <Grid RowDefinitions="26,Auto" Style="{StaticResource TabItem}">
+                    <Grid.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="RunView" />
+                    </Grid.GestureRecognizers>
+                    <Image Source="icon_home.png" Style="{StaticResource TabIcon}">
+                        <Image.Triggers>
+                            <DataTrigger Binding="{Binding IsRunActive}" TargetType="Image" Value="True">
+                                <Setter Property="Source" Value="icon_home_on.png" />
+                            </DataTrigger>
+                        </Image.Triggers>
+                    </Image>
+                    <Label Grid.Row="1" Style="{StaticResource TabLabel}" Text="首页">
+                        <Label.Triggers>
+                            <DataTrigger Binding="{Binding IsRunActive}" TargetType="Label" Value="True">
+                                <Setter Property="TextColor" Value="{StaticResource Accent}" />
+                            </DataTrigger>
+                        </Label.Triggers>
+                    </Label>
+                </Grid>
+
+                <Grid Grid.Column="1" RowDefinitions="26,Auto" Style="{StaticResource TabItem}">
+                    <Grid.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="WorkoutsView" />
+                    </Grid.GestureRecognizers>
+                    <Image Source="icon_course.png" Style="{StaticResource TabIcon}">
+                        <Image.Triggers>
+                            <DataTrigger Binding="{Binding IsWorkoutsActive}" TargetType="Image" Value="True">
+                                <Setter Property="Source" Value="icon_course_on.png" />
+                            </DataTrigger>
+                        </Image.Triggers>
+                    </Image>
+                    <Label Grid.Row="1" Style="{StaticResource TabLabel}" Text="课程">
+                        <Label.Triggers>
+                            <DataTrigger Binding="{Binding IsWorkoutsActive}" TargetType="Label" Value="True">
+                                <Setter Property="TextColor" Value="{StaticResource Accent}" />
+                            </DataTrigger>
+                        </Label.Triggers>
+                    </Label>
+                </Grid>
+
+                <Grid Grid.Column="2" RowDefinitions="26,Auto" Style="{StaticResource TabItem}">
+                    <Grid.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="HistoryView" />
+                    </Grid.GestureRecognizers>
+                    <Image Source="icon_history.png" Style="{StaticResource TabIcon}">
+                        <Image.Triggers>
+                            <DataTrigger Binding="{Binding IsHistoryActive}" TargetType="Image" Value="True">
+                                <Setter Property="Source" Value="icon_history_on.png" />
+                            </DataTrigger>
+                        </Image.Triggers>
+                    </Image>
+                    <Label Grid.Row="1" Style="{StaticResource TabLabel}" Text="记录">
+                        <Label.Triggers>
+                            <DataTrigger Binding="{Binding IsHistoryActive}" TargetType="Label" Value="True">
+                                <Setter Property="TextColor" Value="{StaticResource Accent}" />
+                            </DataTrigger>
+                        </Label.Triggers>
+                    </Label>
+                </Grid>
+
+                <Grid Grid.Column="3" RowDefinitions="26,Auto" Style="{StaticResource TabItem}">
+                    <Grid.GestureRecognizers>
+                        <TapGestureRecognizer Command="{Binding NavigateCommand}" CommandParameter="SettingsView" />
+                    </Grid.GestureRecognizers>
+                    <Image Source="icon_settings.png" Style="{StaticResource TabIcon}">
+                        <Image.Triggers>
+                            <DataTrigger Binding="{Binding IsSettingsActive}" TargetType="Image" Value="True">
+                                <Setter Property="Source" Value="icon_settings_on.png" />
+                            </DataTrigger>
+                        </Image.Triggers>
+                    </Image>
+                    <Label Grid.Row="1" Style="{StaticResource TabLabel}" Text="设置">
+                        <Label.Triggers>
+                            <DataTrigger Binding="{Binding IsSettingsActive}" TargetType="Label" Value="True">
+                                <Setter Property="TextColor" Value="{StaticResource Accent}" />
+                            </DataTrigger>
+                        </Label.Triggers>
+                    </Label>
+                </Grid>
+
+            </Grid>
+        </VerticalStackLayout>
     </Grid>
 
 </ContentPage>

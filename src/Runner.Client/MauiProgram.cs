@@ -60,6 +60,14 @@ namespace Runner.Client
             builder.Services.AddTransient<WatchWorkoutViewModel>();
             builder.Services.AddTransient<WatchWorkoutPage>();
 
+            // Android 的 Entry 自带 Material 下划线，和圆角输入框打架；统一去掉，输入框外观由 XAML 的 Border 负责
+            Microsoft.Maui.Handlers.EntryHandler.Mapper.AppendToMapping("NoUnderline", (handler, _) =>
+            {
+#if ANDROID
+                handler.PlatformView.Background = null;
+#endif
+            });
+
 #if DEBUG
             builder.Logging.AddDebug();
             builder.Logging.SetMinimumLevel(LogLevel.Debug);

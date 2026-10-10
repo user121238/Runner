@@ -36,7 +36,16 @@ public class ActivityDetailPageViewModel : BindableBase, INavigatedAware
     public string StepCount { get => _stepCount; private set => SetProperty(ref _stepCount, value); }
     public string TrackPointCount { get => _trackPointCount; private set => SetProperty(ref _trackPointCount, value); }
     public string TimeRange { get => _timeRange; private set => SetProperty(ref _timeRange, value); }
-    public string Message { get => _message; private set => SetProperty(ref _message, value); }
+    public string Message
+    {
+        get => _message;
+        private set
+        {
+            if (SetProperty(ref _message, value)) RaisePropertyChanged(nameof(HasMessage));
+        }
+    }
+
+    public bool HasMessage => _message.Length > 0;
     public IDrawable Trajectory { get => _trajectory; private set => SetProperty(ref _trajectory, value); }
 
     public void OnNavigatedFrom(INavigationParameters parameters) { }

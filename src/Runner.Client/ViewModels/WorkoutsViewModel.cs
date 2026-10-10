@@ -35,8 +35,13 @@ public class WorkoutsViewModel : BindableBase, IRegionAware
     public string Message
     {
         get => _message;
-        private set => SetProperty(ref _message, value);
+        private set
+        {
+            if (SetProperty(ref _message, value)) RaisePropertyChanged(nameof(HasMessage));
+        }
     }
+
+    public bool HasMessage => _message.Length > 0;
 
     public bool IsNavigationTarget(NavigationContext navigationContext) => true;
 

@@ -41,4 +41,20 @@
     <SolidColorBrush x:Key="Gray600Brush" Color="{StaticResource Gray600}"/>
     <SolidColorBrush x:Key="Gray900Brush" Color="{StaticResource Gray900}"/>
     <SolidColorBrush x:Key="Gray950Brush" Color="{StaticResource Gray950}"/>
-</ResourceDictionary>
+
+    <!--  Runner 设计令牌：单一深色主题。页面只许引用这里的键，不再写散落的十六进制。  -->
+    <Color x:Key="Bg">#0B0F14</Color>
+    <Color x:Key="Surface">#151B23</Color>
+    <Color x:Key="SurfaceAlt">#1E2630</Color>
+    <Color x:Key="Line">#273140</Color>
+    <Color x:Key="TextPrimary">#F2F5F8</Color>
+    <Color x:Key="TextSecondary">#9AA6B4</Color>
+    <Color x:Key="TextTertiary">#66727F</Color>
+    <Color x:Key="Accent">#00E676</Color>
+    <Color x:Key="AccentSoft">#0F2E22</Color>
+    <Color x:Key="OnAccent">#07130C</Color>
+    <Color x:Key="Danger">#FF5252</Color>
+    <Color x:Key="DangerSoft">#2C1518</Color>
+    <Color x:Key="Warn">#FFC107</Color>
+    <Color x:Key="WarnSoft">#2E2410</Color>
+</ResourceDictionary>

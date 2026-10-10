@@ -4,19 +4,45 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:Runner.Client.ViewModels"
              x:DataType="vm:SettingsViewModel"
-             BackgroundColor="Black">
+             BackgroundColor="{StaticResource Bg}">
 
-    <VerticalStackLayout Padding="24,40,24,24" Spacing="16">
-        <Label FontSize="22" Text="设置" TextColor="White" />
-        <Label FontSize="14" Text="步频、时长与切歌都在「课程」里按阶段定义；这里暂时只有诊断。" TextColor="#9E9E9E" />
+    <VerticalStackLayout Padding="20,10,20,14" Spacing="14">
+        <Label Style="{StaticResource PageTitle}" Text="设置" />
 
-        <Button BackgroundColor="#222222"
-                Command="{Binding OpenDiagnosticsCommand}"
-                CornerRadius="8"
-                FontSize="18"
-                HeightRequest="56"
-                Text="诊断"
-                TextColor="White" />
+        <Border Padding="4" Style="{StaticResource Card}">
+            <Grid Padding="12"
+                  BackgroundColor="Transparent"
+                  ColumnDefinitions="Auto,*,Auto"
+                  ColumnSpacing="14">
+                <Grid.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding OpenDiagnosticsCommand}" />
+                </Grid.GestureRecognizers>
+                <Border Padding="0"
+                        BackgroundColor="{StaticResource SurfaceAlt}"
+                        HeightRequest="40"
+                        StrokeShape="RoundRectangle 12"
+                        StrokeThickness="0"
+                        VerticalOptions="Center"
+                        WidthRequest="40">
+                    <Image HeightRequest="22"
+                           HorizontalOptions="Center"
+                           Source="icon_settings_on.png"
+                           VerticalOptions="Center"
+                           WidthRequest="22" />
+                </Border>
+                <VerticalStackLayout Grid.Column="1" Spacing="2" VerticalOptions="Center">
+                    <Label Style="{StaticResource Body}" Text="诊断" />
+                    <Label Style="{StaticResource CardDetail}" Text="单独起停计步、GPS、节拍器与切歌，排查传感器问题" />
+                </VerticalStackLayout>
+                <Label Grid.Column="2"
+                       FontSize="22"
+                       Text="›"
+                       TextColor="{StaticResource TextTertiary}"
+                       VerticalOptions="Center" />
+            </Grid>
+        </Border>
+
+        <Label Style="{StaticResource Hint}" Text="步频、时长 / 距离与切歌都在「课程」里按阶段定义，这里不另设全局步频。" />
     </VerticalStackLayout>
 
 </ContentView>

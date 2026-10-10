@@ -91,6 +91,13 @@
 - 真机第一轮（2026-10-10）：最新包安装、启动无崩溃，首页 / 课程页渲染正常，Prism 区域切换正常。发现并修复：首页初始化挂在区域导航回调上，而 `RegisterViewWithRegion` 填充的初始视图不触发 `IRegionAware.OnNavigatedTo`，权限与来源从未初始化、状态卡在"正在申请权限…"。改为首次点击「开始」时申请权限并创建来源（诊断页进入时同样初始化），首页只在构造时读课程列表。
 - 待真机验收：课程新建 / 编辑；法特莱克课程节点切节拍与切歌；暂停 / 继续 / 结束；记录落盘、列表、详情与轨迹草图；诊断页；室外已知长度路线多次往返、锁屏长跑、加速度兜底精度。
 
+### P7 UI 人性化 — 代码完成（2026-10-10），待真机截图验收
+
+- 设计令牌集中在 `Resources/Styles/Colors.xaml`（近黑底、荧光绿主色、暂停琥珀、结束红）与 `Styles.xaml`（七档字号、卡片 / 芯片 / 胶囊 / 幽灵按钮 / 输入框样式）；页面只引用令牌，不再散写颜色与字号；强制深色主题。
+- 首页三态：空闲 = 课程芯片 + 摘要卡 + 大「开始」；跑动 = 分:秒计时器 + 距离 / 步频 / 目标步频三列 + 课程阶段进度条、剩余量与下一阶段预告；结束 = 成绩 + 再来一次。暂停琥珀、结束红，结束前确认。
+- 底栏换成线性图标 + 文字、选中态荧光绿；课程 / 记录卡片化（点卡片进编辑 / 详情，删除退为幽灵按钮），空态有图标与指引；编辑页分段式「按时长 / 按距离」、输入框去 Android 下划线、键盘弹出底部避让；详情页距离为主数字、六格统计卡。
+- 诊断页按调试工具对待，不重做。
+
 ## 冻结范围：手表蓝牙
 
 以下代码保留并继续编译，不投入：`Services/Ble/*`（`WatchBleService` 系列、`WatchRfcommService`、`WatchAuthService`、`DeviceEncryptInterop`、`IWatchBleService`）、`Models/WatchBle/*`、`Services/Database/MiHealthDataReader`、`WatchWorkoutPage` / `WatchWorkoutViewModel`、`BlePermissionHelper`、`Platforms/Android/java` 与 `libs` 原生库、Manifest 中的 `BLUETOOTH_*` 权限、`MauiProgram` 中的 BLE 注册。

@@ -5,101 +5,129 @@
              xmlns:vm="clr-namespace:Runner.Client.ViewModels"
              Title="{Binding Title}"
              x:DataType="vm:WorkoutEditorPageViewModel"
-             BackgroundColor="Black">
+             BackgroundColor="{StaticResource Bg}">
 
-    <ContentPage.Resources>
-        <Style x:Key="Card" TargetType="Border">
-            <Setter Property="BackgroundColor" Value="#1E1E1E" />
-            <Setter Property="StrokeThickness" Value="0" />
-            <Setter Property="Padding" Value="16" />
-            <Setter Property="StrokeShape" Value="RoundRectangle 12" />
-        </Style>
-        <Style x:Key="FieldLabel" TargetType="Label">
-            <Setter Property="TextColor" Value="White" />
-            <Setter Property="FontSize" Value="15" />
-            <Setter Property="VerticalTextAlignment" Value="Center" />
-        </Style>
-        <Style x:Key="Field" TargetType="Entry">
-            <Setter Property="TextColor" Value="White" />
-            <Setter Property="BackgroundColor" Value="#2A2A2A" />
-            <Setter Property="HorizontalTextAlignment" Value="Center" />
-            <Setter Property="WidthRequest" Value="110" />
-        </Style>
-        <Style x:Key="Toggle" TargetType="Button">
-            <Setter Property="TextColor" Value="White" />
-            <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="HeightRequest" Value="40" />
-            <Setter Property="WidthRequest" Value="72" />
-            <Setter Property="Padding" Value="0" />
-        </Style>
-        <Style x:Key="Stepper" TargetType="Button">
-            <Setter Property="BackgroundColor" Value="#333333" />
-            <Setter Property="TextColor" Value="White" />
-            <Setter Property="FontSize" Value="22" />
-            <Setter Property="WidthRequest" Value="48" />
-            <Setter Property="HeightRequest" Value="48" />
-            <Setter Property="CornerRadius" Value="24" />
-            <Setter Property="Padding" Value="0" />
-        </Style>
-    </ContentPage.Resources>
-
-    <Grid Padding="16" RowDefinitions="*,Auto" RowSpacing="12">
-        <ScrollView>
+    <!--  底边避让软键盘：输入时保存按钮和表单一起上移，不被键盘盖住  -->
+    <Grid Padding="20,12,20,14"
+          RowDefinitions="*,Auto"
+          RowSpacing="12"
+          SafeAreaEdges="Container,Container,Container,SoftInput">
+        <ScrollView VerticalScrollBarVisibility="Never">
             <VerticalStackLayout Spacing="14">
+
                 <!--  名称与轮数  -->
                 <Border Style="{StaticResource Card}">
                     <VerticalStackLayout Spacing="12">
-                        <Label Style="{StaticResource FieldLabel}" Text="课程名称" />
-                        <Entry BackgroundColor="#2A2A2A" Placeholder="例如：法特莱克" PlaceholderColor="#777777" Text="{Binding Name}" TextColor="White" />
-                        <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
-                            <Label Style="{StaticResource FieldLabel}" Text="重复轮数" />
-                            <Button Grid.Column="1" Command="{Binding DecreaseRoundsCommand}" Style="{StaticResource Stepper}" Text="−" />
+                        <Label Style="{StaticResource SectionTitle}" Text="基本信息" />
+                        <Border Style="{StaticResource InputBox}">
+                            <Entry Placeholder="课程名称，例如：法特莱克" Style="{StaticResource InputText}" Text="{Binding Name}" />
+                        </Border>
+                        <Grid ColumnDefinitions="*,Auto,56,Auto" ColumnSpacing="6">
+                            <VerticalStackLayout Spacing="2" VerticalOptions="Center">
+                                <Label Style="{StaticResource Body}" Text="重复轮数" />
+                                <Label Style="{StaticResource CardDetail}" Text="所有阶段按顺序跑完算一轮" />
+                            </VerticalStackLayout>
+                            <Button Grid.Column="1"
+                                    Command="{Binding DecreaseRoundsCommand}"
+                                    Style="{StaticResource IconButton}"
+                                    Text="−" />
                             <Label Grid.Column="2"
-                                   FontAttributes="Bold"
-                                   FontSize="24"
+                                   FontFamily="OpenSansSemibold"
+                                   FontSize="22"
                                    HorizontalTextAlignment="Center"
                                    Text="{Binding Rounds}"
-                                   TextColor="White"
-                                   VerticalTextAlignment="Center"
-                                   WidthRequest="56" />
-                            <Button Grid.Column="3" Command="{Binding IncreaseRoundsCommand}" Style="{StaticResource Stepper}" Text="+" />
+                                   TextColor="{StaticResource TextPrimary}"
+                                   VerticalTextAlignment="Center" />
+                            <Button Grid.Column="3"
+                                    Command="{Binding IncreaseRoundsCommand}"
+                                    Style="{StaticResource IconButton}"
+                                    Text="+" />
                         </Grid>
                     </VerticalStackLayout>
                 </Border>
 
-                <Label FontSize="18" Text="阶段（按顺序执行，每轮重复）" TextColor="White" />
+                <Grid ColumnDefinitions="*,Auto" Margin="4,4,4,0">
+                    <Label Style="{StaticResource SectionTitle}" Text="阶段" VerticalOptions="Center" />
+                    <Label Grid.Column="1" Style="{StaticResource Hint}" Text="按顺序执行，每轮重复" />
+                </Grid>
 
                 <VerticalStackLayout BindableLayout.ItemsSource="{Binding Stages}" Spacing="10">
                     <BindableLayout.ItemTemplate>
                         <DataTemplate x:DataType="vm:StageEditModel">
                             <Border Style="{StaticResource Card}">
-                                <VerticalStackLayout Spacing="10">
+                                <VerticalStackLayout Spacing="12">
                                     <Grid ColumnDefinitions="*,Auto">
-                                        <Label FontAttributes="Bold" Style="{StaticResource FieldLabel}" Text="{Binding Title}" />
+                                        <Label Style="{StaticResource CardTitle}" Text="{Binding Title}" VerticalOptions="Center" />
                                         <Button Grid.Column="1"
-                                                BackgroundColor="#B71C1C"
                                                 Command="{Binding Source={RelativeSource AncestorType={x:Type vm:WorkoutEditorPageViewModel}}, Path=RemoveStageCommand}"
                                                 CommandParameter="{Binding .}"
-                                                Style="{StaticResource Toggle}"
+                                                Style="{StaticResource GhostDangerButton}"
                                                 Text="删除" />
                                     </Grid>
-                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                                        <Label Style="{StaticResource FieldLabel}" Text="步频 SPM（0 = 不播节拍）" />
-                                        <Entry Grid.Column="1" Keyboard="Numeric" Style="{StaticResource Field}" Text="{Binding CadenceText}" />
+
+                                    <Grid ColumnDefinitions="*,120" ColumnSpacing="12">
+                                        <VerticalStackLayout Spacing="2" VerticalOptions="Center">
+                                            <Label Style="{StaticResource Body}" Text="步频" />
+                                            <Label Style="{StaticResource CardDetail}" Text="SPM，填 0 表示本阶段不播节拍" />
+                                        </VerticalStackLayout>
+                                        <Border Grid.Column="1" Style="{StaticResource InputBox}">
+                                            <Entry HorizontalTextAlignment="Center"
+                                                   Keyboard="Numeric"
+                                                   Style="{StaticResource InputText}"
+                                                   Text="{Binding CadenceText}" />
+                                        </Border>
                                     </Grid>
-                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                                        <Label Style="{StaticResource FieldLabel}" Text="结束条件（二选一）" />
-                                        <Button Grid.Column="1" BackgroundColor="{Binding DurationButtonColor}" Command="{Binding UseDurationCommand}" Style="{StaticResource Toggle}" Text="时长" />
-                                        <Button Grid.Column="2" BackgroundColor="{Binding DistanceButtonColor}" Command="{Binding UseDistanceCommand}" Style="{StaticResource Toggle}" Text="距离" />
+
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                        <Label Style="{StaticResource Body}" Text="结束条件" VerticalOptions="Center" />
+                                        <Border Grid.Column="1"
+                                                Padding="3"
+                                                BackgroundColor="{StaticResource SurfaceAlt}"
+                                                StrokeShape="RoundRectangle 13"
+                                                StrokeThickness="0">
+                                            <HorizontalStackLayout Spacing="2">
+                                                <Button Command="{Binding UseDurationCommand}" Style="{StaticResource SegmentButton}" Text="按时长">
+                                                    <Button.Triggers>
+                                                        <DataTrigger Binding="{Binding IsDuration}" TargetType="Button" Value="True">
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource Accent}" />
+                                                            <Setter Property="TextColor" Value="{StaticResource OnAccent}" />
+                                                        </DataTrigger>
+                                                    </Button.Triggers>
+                                                </Button>
+                                                <Button Command="{Binding UseDistanceCommand}" Style="{StaticResource SegmentButton}" Text="按距离">
+                                                    <Button.Triggers>
+                                                        <DataTrigger Binding="{Binding IsDuration}" TargetType="Button" Value="False">
+                                                            <Setter Property="BackgroundColor" Value="{StaticResource Accent}" />
+                                                            <Setter Property="TextColor" Value="{StaticResource OnAccent}" />
+                                                        </DataTrigger>
+                                                    </Button.Triggers>
+                                                </Button>
+                                            </HorizontalStackLayout>
+                                        </Border>
                                     </Grid>
-                                    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                                        <Label Style="{StaticResource FieldLabel}" Text="{Binding ValueLabel}" />
-                                        <Entry Grid.Column="1" Keyboard="Numeric" Style="{StaticResource Field}" Text="{Binding EndValueText}" />
-                                        <Label Grid.Column="2" Style="{StaticResource FieldLabel}" Text="{Binding Unit}" WidthRequest="40" />
+
+                                    <Grid ColumnDefinitions="*,120" ColumnSpacing="12">
+                                        <Label Style="{StaticResource Body}" Text="{Binding ValueLabel}" VerticalOptions="Center" />
+                                        <Border Grid.Column="1" Style="{StaticResource InputBox}">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                                <Entry HorizontalTextAlignment="Center"
+                                                       Keyboard="Numeric"
+                                                       Style="{StaticResource InputText}"
+                                                       Text="{Binding EndValueText}" />
+                                                <Label Grid.Column="1"
+                                                       Style="{StaticResource CardDetail}"
+                                                       Text="{Binding Unit}"
+                                                       VerticalOptions="Center" />
+                                            </Grid>
+                                        </Border>
                                     </Grid>
-                                    <Grid ColumnDefinitions="*,Auto">
-                                        <Label Style="{StaticResource FieldLabel}" Text="进入该阶段时切下一首歌" />
-                                        <Switch Grid.Column="1" IsToggled="{Binding SwitchTrackOnEnter}" OnColor="#4CAF50" />
+
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                        <VerticalStackLayout Spacing="2" VerticalOptions="Center">
+                                            <Label Style="{StaticResource Body}" Text="进入时切下一首歌" />
+                                            <Label Style="{StaticResource CardDetail}" Text="用换歌提醒你：节奏变了" />
+                                        </VerticalStackLayout>
+                                        <Switch Grid.Column="1" IsToggled="{Binding SwitchTrackOnEnter}" VerticalOptions="Center" />
                                     </Grid>
                                 </VerticalStackLayout>
                             </Border>
@@ -107,26 +135,24 @@
                     </BindableLayout.ItemTemplate>
                 </VerticalStackLayout>
 
-                <Button BackgroundColor="#333333"
-                        Command="{Binding AddStageCommand}"
-                        CornerRadius="8"
+                <Button Command="{Binding AddStageCommand}"
+                        FontSize="15"
                         HeightRequest="48"
-                        Text="添加阶段"
-                        TextColor="White" />
+                        Style="{StaticResource SecondaryButton}"
+                        Text="＋ 添加阶段" />
 
-                <Label FontSize="14" Text="{Binding Message}" TextColor="Orange" />
+                <Label HorizontalTextAlignment="Center"
+                       IsVisible="{Binding HasMessage}"
+                       Style="{StaticResource Caption}"
+                       Text="{Binding Message}"
+                       TextColor="{StaticResource Warn}" />
             </VerticalStackLayout>
         </ScrollView>
 
         <Button Grid.Row="1"
-                BackgroundColor="White"
                 Command="{Binding SaveCommand}"
-                CornerRadius="28"
-                FontAttributes="Bold"
-                FontSize="18"
-                HeightRequest="56"
-                Text="保存"
-                TextColor="Black" />
+                Style="{StaticResource PrimaryButton}"
+                Text="保存课程" />
     </Grid>
 
 </ContentPage>

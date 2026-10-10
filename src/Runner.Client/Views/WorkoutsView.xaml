@@ -4,59 +4,79 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:Runner.Client.ViewModels"
              x:DataType="vm:WorkoutsViewModel"
-             BackgroundColor="Black">
+             BackgroundColor="{StaticResource Bg}">
 
-    <Grid Padding="24,40,24,16" RowDefinitions="Auto,*,Auto" RowSpacing="12">
-        <Label FontSize="22" Text="课程" TextColor="White" />
+    <Grid Padding="20,10,20,14" RowDefinitions="Auto,*,Auto" RowSpacing="14">
+        <Label Style="{StaticResource PageTitle}" Text="课程" />
 
-        <CollectionView Grid.Row="1" ItemsSource="{Binding Items}" SelectionMode="None">
+        <CollectionView Grid.Row="1"
+                        ItemsSource="{Binding Items}"
+                        SelectionMode="None"
+                        VerticalScrollBarVisibility="Never">
             <CollectionView.EmptyView>
-                <Label HorizontalTextAlignment="Center"
-                       Text="还没有课程，点下面新建一个"
-                       TextColor="#9E9E9E"
-                       VerticalOptions="Center" />
+                <VerticalStackLayout HorizontalOptions="Center" Spacing="10" VerticalOptions="Center">
+                    <Image HeightRequest="48"
+                           HorizontalOptions="Center"
+                           Opacity="0.7"
+                           Source="icon_course.png"
+                           WidthRequest="48" />
+                    <Label HorizontalTextAlignment="Center" Style="{StaticResource CardTitle}" Text="还没有课程" />
+                    <Label HorizontalTextAlignment="Center"
+                           Style="{StaticResource Hint}"
+                           Text="按阶段设定步频与时长或距离，到节点自动切歌。&#10;比如：180 步频 2 分钟 → 120 步频 1 分钟，重复 4 轮。" />
+                </VerticalStackLayout>
             </CollectionView.EmptyView>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="vm:WorkoutListItem">
-                    <Border Margin="0,0,0,10"
-                            Padding="16"
-                            BackgroundColor="#1E1E1E"
-                            StrokeShape="RoundRectangle 12"
-                            StrokeThickness="0">
-                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                            <VerticalStackLayout Spacing="2" VerticalOptions="Center">
-                                <Label FontAttributes="Bold" FontSize="18" Text="{Binding Name}" TextColor="White" />
-                                <Label FontSize="13" Text="{Binding Summary}" TextColor="#9E9E9E" />
-                            </VerticalStackLayout>
-                            <Button Grid.Column="1"
-                                    BackgroundColor="#333333"
-                                    Command="{Binding Source={RelativeSource AncestorType={x:Type vm:WorkoutsViewModel}}, Path=EditCommand}"
-                                    CommandParameter="{Binding .}"
-                                    CornerRadius="8"
-                                    Text="编辑"
-                                    TextColor="White" />
-                            <Button Grid.Column="2"
-                                    BackgroundColor="#B71C1C"
-                                    Command="{Binding Source={RelativeSource AncestorType={x:Type vm:WorkoutsViewModel}}, Path=DeleteCommand}"
-                                    CommandParameter="{Binding .}"
-                                    CornerRadius="8"
-                                    Text="删除"
-                                    TextColor="White" />
+                    <Border Margin="0,0,0,10" Style="{StaticResource Card}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:WorkoutsViewModel}}, Path=EditCommand}" CommandParameter="{Binding .}" />
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="*,Auto"
+                              ColumnSpacing="12"
+                              RowDefinitions="Auto,Auto,Auto"
+                              RowSpacing="4">
+                            <Label Style="{StaticResource CardTitle}" Text="{Binding Name}" />
+                            <Label Grid.Column="1"
+                                   FontSize="22"
+                                   Text="›"
+                                   TextColor="{StaticResource TextTertiary}"
+                                   VerticalOptions="Start" />
+                            <Label Grid.Row="1"
+                                   Grid.ColumnSpan="2"
+                                   Style="{StaticResource CardDetail}"
+                                   Text="{Binding Summary}" />
+                            <Grid Grid.Row="2"
+                                  Grid.ColumnSpan="2"
+                                  Margin="0,6,0,0"
+                                  ColumnDefinitions="*,Auto"
+                                  ColumnSpacing="8">
+                                <Label FontSize="13"
+                                       LineBreakMode="TailTruncation"
+                                       MaxLines="2"
+                                       Style="{StaticResource Body}"
+                                       Text="{Binding Stages}"
+                                       VerticalOptions="Center" />
+                                <Button Grid.Column="1"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type vm:WorkoutsViewModel}}, Path=DeleteCommand}"
+                                        CommandParameter="{Binding .}"
+                                        Style="{StaticResource GhostDangerButton}"
+                                        Text="删除" />
+                            </Grid>
                         </Grid>
                     </Border>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>
 
-        <Button Grid.Row="2"
-                BackgroundColor="White"
-                Command="{Binding CreateCommand}"
-                CornerRadius="28"
-                FontAttributes="Bold"
-                FontSize="18"
-                HeightRequest="56"
-                Text="新建课程"
-                TextColor="Black" />
+        <VerticalStackLayout Grid.Row="2" Spacing="8">
+            <Label HorizontalTextAlignment="Center"
+                   IsVisible="{Binding HasMessage}"
+                   Style="{StaticResource Caption}"
+                   Text="{Binding Message}"
+                   TextColor="{StaticResource Warn}" />
+            <Button Command="{Binding CreateCommand}" Style="{StaticResource PrimaryButton}" Text="新建课程" />
+        </VerticalStackLayout>
     </Grid>
 
 </ContentView>

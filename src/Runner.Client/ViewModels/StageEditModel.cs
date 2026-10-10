@@ -8,9 +8,6 @@ namespace Runner.Client.ViewModels;
 /// <summary>课程编辑页里的一行阶段：文本输入，保存时解析校验；时长按分钟输入，距离按米。</summary>
 public sealed class StageEditModel : BindableBase
 {
-    private static readonly Color SelectedColor = Color.FromArgb("#4CAF50");
-    private static readonly Color UnselectedColor = Color.FromArgb("#333333");
-
     private int _number;
     private string _cadenceText = "180";
     private bool _isDuration = true;
@@ -61,15 +58,11 @@ public sealed class StageEditModel : BindableBase
             if (!SetProperty(ref _isDuration, value)) return;
             RaisePropertyChanged(nameof(ValueLabel));
             RaisePropertyChanged(nameof(Unit));
-            RaisePropertyChanged(nameof(DurationButtonColor));
-            RaisePropertyChanged(nameof(DistanceButtonColor));
         }
     }
 
     public string ValueLabel => IsDuration ? "时长" : "距离";
     public string Unit => IsDuration ? "分钟" : "米";
-    public Color DurationButtonColor => IsDuration ? SelectedColor : UnselectedColor;
-    public Color DistanceButtonColor => IsDuration ? UnselectedColor : SelectedColor;
 
     public string EndValueText
     {

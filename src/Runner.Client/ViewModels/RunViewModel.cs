@@ -1,7 +1,10 @@
 ﻿using System.Collections.ObjectModel;
+using System.Globalization;
 using Prism.Commands;
 using Prism.Mvvm;
+using Prism.Navigation;
 using Prism.Navigation.Regions;
+using Prism.Services;
 using Runner.Business.Platforms.Android.Session;
 using Runner.Core.Session;
 using Runner.Core.Workouts;
@@ -9,71 +12,131 @@ using Runner.Core.Workouts;
 namespace Runner.Client.ViewModels;
 
 /// <summary>
-/// 首页：时长 / 距离 / 实际步频 / 目标步频，一个主按钮随状态变为 开始 / 暂停 / 继续；
-/// 空闲时选课程（或自由跑），进行中显示课程的轮次、阶段与剩余量。
-/// 权限与传感器来源在首次点击开始时才申请、创建，页面本身不依赖它们。
+/// 首页三态：空闲选课程（或自由跑）看摘要；跑动中看时长 / 距离 / 步频 / 目标步频与课程阶段进度；结束后看成绩再来一次。
+/// 权限与传感器来源在首次点击开始时才申请、创建，页面本身不依赖它们；结束前确认，免得误触丢掉一次跑步。
 /// </summary>
 public class RunViewModel : BindableBase, IRegionAware
 {
-    private const string FreeRunChoice = "自由跑";
+    private const string FreeRunName = "自由跑";
+    private static readonly CultureInfo ChineseCulture = new("zh-CN");
     private readonly RunSessionHost _host;
-    private IReadOnlyList<WorkoutPlan> _plans = Array.Empty<WorkoutPlan>();
-    private bool _loadingChoices;
+    private readonly IPageDialogService _dialogs;
+    private readonly INavigationService _navigation;
+    private WorkoutChoice? _selectedChoice;
+    private WorkoutPlan? _activePlan;
+    private int _lastRunId;
 
     private string _statusText = "";
-    private string _elapsed = "00:00:00";
+    private string _workoutHeader = "";
+    private double _stageProgress;
+    private string _remainingText = "";
+    private string _nextStageText = "";
+    private string _elapsed = "00:00";
     private double _distanceKm;
     private string _cadenceText = "0";
     private string _targetCadenceText = "—";
+    private string _summaryTitle = FreeRunName;
+    private string _summaryDetail = "";
+    private string _summaryStages = "";
     private string _message = "";
     private string _primaryText = "开始";
     private bool _canStop;
+    private bool _hasSession;
     private bool _isIdle = true;
-    private bool _isWorkoutActive;
-    private string _workoutStatus = "";
-    private int _selectedWorkoutIndex;
+    private bool _isRunning;
+    private bool _isPaused;
+    private bool _hasWorkout;
+    private bool _showIdleHeader = true;
+    private bool _showNoRunHint;
+    private bool _hasLastRun;
+    private string _dateTitle = "";
+    private string _lastRunMetrics = "";
+    private string _lastRunMeta = "";
 
-    public RunViewModel(RunSessionHost host)
+    public RunViewModel(RunSessionHost host, IPageDialogService dialogs, INavigationService navigation)
     {
         _host = host;
+        _dialogs = dialogs;
+        _navigation = navigation;
         PrimaryCommand = new AsyncDelegateCommand(PrimaryAsync);
-        StopCommand = new DelegateCommand(Stop, () => CanStop);
+        StopCommand = new AsyncDelegateCommand(StopAsync, () => CanStop);
+        SelectCommand = new DelegateCommand<WorkoutChoice>(Select);
+        OpenLastRunCommand = new AsyncDelegateCommand(
+            () => _navigation.NavigateAsync("ActivityDetailPage", ("id", _lastRunId)),
+            () => HasLastRun);
         _host.Updated += OnHostUpdated;
         _host.Error += OnHostMessage;
         _host.Notice += OnHostMessage;
         _host.Workouts.Changed += OnWorkoutsChanged;
-        _ = LoadWorkoutChoicesAsync();
+        _host.Activities.Changed += OnActivitiesChanged;
+        _ = LoadChoicesAsync();
+        _ = LoadLastRunAsync();
     }
 
     public AsyncDelegateCommand PrimaryCommand { get; }
-    public DelegateCommand StopCommand { get; }
+    public AsyncDelegateCommand StopCommand { get; }
+    public DelegateCommand<WorkoutChoice> SelectCommand { get; }
+    public AsyncDelegateCommand OpenLastRunCommand { get; }
 
-    /// <summary>第 0 项固定为自由跑，之后是课程名。</summary>
-    public ObservableCollection<string> WorkoutChoices { get; } = new() { FreeRunChoice };
+    /// <summary>第 0 项固定为自由跑，之后是课程。</summary>
+    public ObservableCollection<WorkoutChoice> Choices { get; } = new();
 
-    public string StatusText { get => _statusText; private set => SetProperty(ref _statusText, value); }
+    // ---- 状态 ----
+    public string StatusText
+    {
+        get => _statusText;
+        private set
+        {
+            if (SetProperty(ref _statusText, value)) RaisePropertyChanged(nameof(HasStatus));
+        }
+    }
+
+    public bool HasStatus => _statusText.Length > 0;
+    public bool HasSession { get => _hasSession; private set => SetProperty(ref _hasSession, value); }
+    public bool IsIdle { get => _isIdle; private set => SetProperty(ref _isIdle, value); }
+    public bool IsRunning { get => _isRunning; private set => SetProperty(ref _isRunning, value); }
+    public bool IsPaused { get => _isPaused; private set => SetProperty(ref _isPaused, value); }
+
+    // ---- 课程进度 ----
+    public bool HasWorkout { get => _hasWorkout; private set => SetProperty(ref _hasWorkout, value); }
+    public string WorkoutHeader { get => _workoutHeader; private set => SetProperty(ref _workoutHeader, value); }
+    public double StageProgress { get => _stageProgress; private set => SetProperty(ref _stageProgress, value); }
+    public string RemainingText { get => _remainingText; private set => SetProperty(ref _remainingText, value); }
+    public string NextStageText { get => _nextStageText; private set => SetProperty(ref _nextStageText, value); }
+
+    // ---- 四个数字 ----
     public string Elapsed { get => _elapsed; private set => SetProperty(ref _elapsed, value); }
     public double DistanceKm { get => _distanceKm; private set => SetProperty(ref _distanceKm, value); }
     public string CadenceText { get => _cadenceText; private set => SetProperty(ref _cadenceText, value); }
     public string TargetCadenceText { get => _targetCadenceText; private set => SetProperty(ref _targetCadenceText, value); }
-    public string Message { get => _message; private set => SetProperty(ref _message, value); }
-    public string PrimaryText { get => _primaryText; private set => SetProperty(ref _primaryText, value); }
-    public bool CanStop { get => _canStop; private set => SetProperty(ref _canStop, value); }
-    public bool IsIdle { get => _isIdle; private set => SetProperty(ref _isIdle, value); }
-    public bool IsWorkoutActive { get => _isWorkoutActive; private set => SetProperty(ref _isWorkoutActive, value); }
-    public string WorkoutStatus { get => _workoutStatus; private set => SetProperty(ref _workoutStatus, value); }
 
-    public int SelectedWorkoutIndex
+    // ---- 空闲时的课程摘要 ----
+    public string SummaryTitle { get => _summaryTitle; private set => SetProperty(ref _summaryTitle, value); }
+    public string SummaryDetail { get => _summaryDetail; private set => SetProperty(ref _summaryDetail, value); }
+    public string SummaryStages { get => _summaryStages; private set => SetProperty(ref _summaryStages, value); }
+    public bool HasPlan => _selectedChoice?.Plan != null;
+
+    // ---- 空闲时的顶部：今天的日期与上次跑步 ----
+    public bool ShowIdleHeader { get => _showIdleHeader; private set => SetProperty(ref _showIdleHeader, value); }
+    public bool ShowNoRunHint { get => _showNoRunHint; private set => SetProperty(ref _showNoRunHint, value); }
+    public bool HasLastRun { get => _hasLastRun; private set => SetProperty(ref _hasLastRun, value); }
+    public string DateTitle { get => _dateTitle; private set => SetProperty(ref _dateTitle, value); }
+    public string LastRunMetrics { get => _lastRunMetrics; private set => SetProperty(ref _lastRunMetrics, value); }
+    public string LastRunMeta { get => _lastRunMeta; private set => SetProperty(ref _lastRunMeta, value); }
+
+    // ---- 操作 ----
+    public string Message
     {
-        get => _selectedWorkoutIndex;
-        set
+        get => _message;
+        private set
         {
-            if (!SetProperty(ref _selectedWorkoutIndex, value) || _loadingChoices) return;
-            _host.SelectedWorkout = value > 0 && value - 1 < _plans.Count ? _plans[value - 1] : null;
-            _host.PreferredWorkoutId = _host.SelectedWorkout?.Id ?? 0;
-            Refresh();
+            if (SetProperty(ref _message, value)) RaisePropertyChanged(nameof(HasMessage));
         }
     }
+
+    public bool HasMessage => _message.Length > 0;
+    public string PrimaryText { get => _primaryText; private set => SetProperty(ref _primaryText, value); }
+    public bool CanStop { get => _canStop; private set => SetProperty(ref _canStop, value); }
 
     public bool IsNavigationTarget(NavigationContext navigationContext) => true;
 
@@ -81,34 +144,67 @@ public class RunViewModel : BindableBase, IRegionAware
 
     public void OnNavigatedTo(NavigationContext navigationContext) => Refresh();
 
-    private void OnWorkoutsChanged() => MainThread.BeginInvokeOnMainThread(() => _ = LoadWorkoutChoicesAsync());
+    private void OnWorkoutsChanged() => MainThread.BeginInvokeOnMainThread(() => _ = LoadChoicesAsync());
 
-    private async Task LoadWorkoutChoicesAsync()
+    private void OnActivitiesChanged() => MainThread.BeginInvokeOnMainThread(() => _ = LoadLastRunAsync());
+
+    private async Task LoadLastRunAsync()
+    {
+        try
+        {
+            var records = await _host.Activities.GetAllAsync();
+            var last = records.MaxBy(r => r.StartTimeUtc);
+            _lastRunId = last?.Id ?? 0;
+            HasLastRun = last != null;
+            if (last != null)
+            {
+                string workout = string.IsNullOrEmpty(last.WorkoutName) ? FreeRunName : last.WorkoutName;
+                LastRunMetrics = $"{last.DistanceMeters / 1000:F2} 公里 · {ActivityListItem.FormatDuration(last.ElapsedSeconds)} · {last.AverageCadence:F0} SPM";
+                LastRunMeta = $"{last.StartTimeUtc.ToLocalTime():M月d日 HH:mm} · {workout}";
+            }
+        }
+        catch (Exception ex)
+        {
+            Message = $"记录加载失败: {ex.Message}";
+        }
+        OpenLastRunCommand.RaiseCanExecuteChanged();
+        Refresh();
+    }
+
+    private async Task LoadChoicesAsync()
     {
         try
         {
             var plans = await _host.Workouts.GetAllAsync();
             int keepId = _host.SelectedWorkout?.Id ?? _host.PreferredWorkoutId;
 
-            _loadingChoices = true;
-            _plans = plans;
-            WorkoutChoices.Clear();
-            WorkoutChoices.Add(FreeRunChoice);
-            foreach (var plan in plans) WorkoutChoices.Add(plan.Name);
-            _loadingChoices = false;
+            Choices.Clear();
+            Choices.Add(new WorkoutChoice(FreeRunName, null));
+            foreach (var plan in plans) Choices.Add(new WorkoutChoice(plan.Name, plan));
 
-            int index = 0;
-            for (int i = 0; i < plans.Count; i++)
-                if (plans[i].Id == keepId) index = i + 1;
-
-            // 被编辑过的课程要换成新实例
-            _host.SelectedWorkout = index > 0 ? plans[index - 1] : null;
-            SelectedWorkoutIndex = index;
+            // 被编辑过的课程换成新实例；被删掉的回到自由跑
+            Select(Choices.FirstOrDefault(c => c.Plan != null && c.Plan.Id == keepId) ?? Choices[0]);
         }
         catch (Exception ex)
         {
             Message = $"课程加载失败: {ex.Message}";
+            Refresh();
         }
+    }
+
+    private void Select(WorkoutChoice? choice)
+    {
+        if (choice == null) return;
+        foreach (var c in Choices) c.IsSelected = ReferenceEquals(c, choice);
+        _selectedChoice = choice;
+        _host.SelectedWorkout = choice.Plan;
+        _host.PreferredWorkoutId = choice.Plan?.Id ?? 0;
+
+        var plan = choice.Plan;
+        SummaryTitle = choice.Name;
+        SummaryDetail = plan == null ? "不播节拍，只记录时长、距离与步频" : WorkoutListItem.Describe(plan);
+        SummaryStages = plan == null ? "" : WorkoutListItem.DescribeStages(plan);
+        RaisePropertyChanged(nameof(HasPlan));
         Refresh();
     }
 
@@ -129,7 +225,8 @@ public class RunViewModel : BindableBase, IRegionAware
                     await controller.ResumeAsync();
                     break;
                 default:
-                    await controller.StartAsync(_host.SelectedWorkout);
+                    _activePlan = _host.SelectedWorkout;
+                    await controller.StartAsync(_activePlan);
                     break;
             }
         }
@@ -140,11 +237,16 @@ public class RunViewModel : BindableBase, IRegionAware
         Refresh();
     }
 
-    private void Stop()
+    private async Task StopAsync()
     {
+        var controller = _host.Controller;
+        if (controller?.IsActive != true) return;
+
+        bool confirmed = await _dialogs.DisplayAlertAsync("结束本次跑步？", "结束后保存记录；跑动不足 5 秒不保存。", "结束", "继续跑");
+        if (!confirmed) return;
         try
         {
-            _host.Controller?.Stop();
+            controller.Stop();
         }
         catch (Exception ex)
         {
@@ -161,71 +263,99 @@ public class RunViewModel : BindableBase, IRegionAware
     {
         var controller = _host.Controller;
         var session = controller?.Session;
-        bool cadenceAvailable = session?.CadenceAvailable ?? controller?.HasCadenceSource ?? true;
+        var state = session?.State;
         bool active = controller?.IsActive == true;
+        bool cadenceAvailable = session?.CadenceAvailable ?? controller?.HasCadenceSource ?? true;
+
+        HasSession = session != null;
         IsIdle = !active;
+        ShowIdleHeader = !active && session == null;
+        ShowNoRunHint = ShowIdleHeader && !HasLastRun;
+        DateTitle = DateTime.Now.ToString("M月d日 dddd", ChineseCulture);
+        IsRunning = state == RunSessionState.Running;
+        IsPaused = state == RunSessionState.Paused;
+        StatusText = state switch
+        {
+            RunSessionState.Running => "跑步中",
+            RunSessionState.Paused => "已暂停",
+            RunSessionState.Stopped => "已结束",
+            _ => controller == null ? "" : (controller.HasGps ? "准备就绪" : _host.LocationStatus)
+        };
+        PrimaryText = state switch
+        {
+            RunSessionState.Running => "暂停",
+            RunSessionState.Paused => "继续",
+            _ => "开始"
+        };
+        CanStop = active && session?.CanStop == true;
 
         if (session == null)
         {
-            StatusText = controller == null ? ""
-                : controller.HasGps ? "准备就绪" : _host.LocationStatus;
-            Elapsed = "00:00:00";
+            Elapsed = "00:00";
             DistanceKm = 0;
             CadenceText = cadenceAvailable ? "0" : "—";
-            TargetCadenceText = IdleTargetText();
-            PrimaryText = "开始";
-            CanStop = false;
-            IsWorkoutActive = false;
-            WorkoutStatus = "";
+            TargetCadenceText = "—";
         }
         else
         {
-            StatusText = session.State switch
-            {
-                RunSessionState.Running => "跑步中",
-                RunSessionState.Paused => "已暂停",
-                RunSessionState.Stopped => "已结束",
-                _ => "准备就绪"
-            };
-            Elapsed = session.Elapsed.ToString(@"hh\:mm\:ss");
+            Elapsed = FormatElapsed(session.Elapsed);
             DistanceKm = session.DistanceKm;
             CadenceText = cadenceAvailable ? session.CurrentCadence.ToString("F0") : "—";
-            TargetCadenceText = active
-                ? (session.TargetCadence > 0 ? session.TargetCadence.ToString() : "—")
-                : IdleTargetText();
-            PrimaryText = session.State switch
-            {
-                RunSessionState.Running => "暂停",
-                RunSessionState.Paused => "继续",
-                _ => "开始"
-            };
-            CanStop = session.CanStop;
-
-            var workout = controller!.Workout;
-            IsWorkoutActive = active && workout != null;
-            WorkoutStatus = IsWorkoutActive ? DescribeWorkout(workout!, session) : "";
+            TargetCadenceText = active && session.TargetCadence > 0 ? session.TargetCadence.ToString() : "—";
         }
 
-        PrimaryCommand.RaiseCanExecuteChanged();
+        var workout = controller?.Workout;
+        HasWorkout = active && workout != null;
+        if (HasWorkout)
+        {
+            DescribeWorkout(workout!, session!);
+        }
+        else
+        {
+            WorkoutHeader = workout != null && state == RunSessionState.Stopped ? workout.Name : "";
+            StageProgress = 0;
+            RemainingText = "";
+            NextStageText = "";
+        }
+
         StopCommand.RaiseCanExecuteChanged();
     }
 
-    private string IdleTargetText()
+    private void DescribeWorkout(WorkoutRunner workout, RunSession session)
     {
-        var first = _host.SelectedWorkout?.Stages.FirstOrDefault();
-        return first is { TargetCadence: > 0 } ? first.TargetCadence.ToString() : "—";
-    }
-
-    private static string DescribeWorkout(WorkoutRunner workout, RunSession session)
-    {
-        if (workout.IsCompleted) return $"{workout.Name} · 课程完成";
+        int rounds = workout.TotalStages / workout.StagesPerRound;
+        if (workout.IsCompleted)
+        {
+            WorkoutHeader = $"{workout.Name} · 课程完成";
+            StageProgress = 1;
+            RemainingText = "";
+            NextStageText = "课程已跑完，可以继续自由跑或结束";
+            return;
+        }
 
         var stage = workout.Current!;
         double remaining = workout.Remaining(session.Elapsed, session.DistanceMeters);
-        string remainingText = stage.EndKind == StageEndKind.Duration
-            ? TimeSpan.FromSeconds(Math.Ceiling(remaining)).ToString(remaining >= 3600 ? @"h\:mm\:ss" : @"m\:ss")
-            : $"{remaining:F0} 米";
-        int rounds = workout.TotalStages / workout.StagesPerRound;
-        return $"{workout.Name} · 第 {workout.CurrentRound}/{rounds} 轮 · 阶段 {workout.CurrentStageNumber}/{workout.StagesPerRound} · 剩 {remainingText}";
+        WorkoutHeader = $"{workout.Name} · 第 {workout.CurrentRound}/{rounds} 轮 · 阶段 {workout.CurrentStageNumber}/{workout.StagesPerRound}";
+        StageProgress = stage.EndValue > 0 ? Math.Clamp(1 - remaining / stage.EndValue, 0, 1) : 0;
+        RemainingText = stage.EndKind == StageEndKind.Duration
+            ? $"剩 {ActivityListItem.FormatDuration(Math.Ceiling(remaining))}"
+            : $"剩 {remaining:F0} 米";
+        NextStageText = DescribeNext(workout, rounds);
     }
+
+    /// <summary>下一阶段预告：法特莱克这种交替课程，跑的人最想知道"接下来是快还是慢"。</summary>
+    private string DescribeNext(WorkoutRunner workout, int rounds)
+    {
+        bool lastInRound = workout.CurrentStageNumber >= workout.StagesPerRound;
+        if (lastInRound && workout.CurrentRound >= rounds) return "最后一个阶段，坚持住";
+
+        var stages = (_activePlan ?? _host.SelectedWorkout)?.Stages;
+        if (stages == null || stages.Count != workout.StagesPerRound) return "";
+        var next = stages[lastInRound ? 0 : workout.CurrentStageNumber];
+        return "下一阶段 " + WorkoutListItem.DescribeStage(next);
+    }
+
+    /// <summary>不满 1 小时只显示 分:秒，大数字更大；满 1 小时再带小时。</summary>
+    private static string FormatElapsed(TimeSpan elapsed) =>
+        elapsed.TotalHours >= 1 ? elapsed.ToString(@"h\:mm\:ss") : elapsed.ToString(@"mm\:ss");
 }

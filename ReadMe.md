@@ -2,7 +2,7 @@
 
 基于 **.NET 10 MAUI** 的离线跑步应用，把运动计时、课程节拍、GPS 轨迹、计步、配速和历史记录放在同一个会话里。
 
-当前代码标签：[0.0.1-alpha](https://github.com/user121238/Runner/tree/0.0.1-alpha)，处于预发布阶段。
+当前代码标签：[0.0.1-alpha.1](https://github.com/user121238/Runner/tree/0.0.1-alpha.1)，处于预发布阶段。
 
 [版本与下载](https://github.com/user121238/Runner/releases) · [GitHub Actions](https://github.com/user121238/Runner/actions/workflows/ios-unsigned.yml) · [iOS 发布指南](doc/IOS_RELEASE.md)
 
@@ -98,8 +98,8 @@ bash scripts/build-unsigned-ipa.sh 0.0.1-alpha 1 artifacts/ios
 
 ```bash
 git push origin master
-git tag -a 0.0.1-alpha.1 -m "Runner 0.0.1-alpha.1"
-git push origin 0.0.1-alpha.1
+git tag -a 0.0.1-alpha.2 -m "Runner 0.0.1-alpha.2"
+git push origin 0.0.1-alpha.2
 ```
 
 保留已发布标签的指向；新代码使用新标签，不覆盖已有的 `0.0.1-alpha`。
@@ -116,6 +116,8 @@ git push origin 0.0.1-alpha.1
 | IPA 文件名 | `Runner-0.0.1-alpha-ios-arm64-unsigned.ipa` |
 
 在 Actions 中手动运行 **iOS unsigned IPA** 时，填写 `0.0.1-alpha` 这类版本号，**只生成 Artifacts，不创建 Release**。IPA 构建产物保留 14 天，诊断日志保留 7 天。当前自动发布只打包 iOS，Android 使用本地构建流程。
+
+**下载入口**：打开 Actions 运行总览中的 **IPA 下载** 摘要链接，或在页面底部的 **Artifacts** 下载 `ios-unsigned-*` ZIP 后解压。标签发布成功后，也可从 **Releases → 对应版本 → Assets** 直接下载 `.ipa`；`ios-diagnostics-*` 是日志，不是安装包。
 
 ## 测试
 

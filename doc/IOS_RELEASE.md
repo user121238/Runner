@@ -18,6 +18,15 @@ Actions 中手动运行 `workflow_dispatch` 时填写不带 `v` 的版本，如 
 
 同一标签的任务串行执行。重跑使用同名 IPA 和 `gh release upload --clobber`，替换该 Release 的 IPA 与校验文件，不复制 Release、不删除其他附件。请保持发布标签指向不变；需要改代码时使用新版本标签。
 
+### 在哪里下载 IPA
+
+- 打开对应 Actions **运行总览 / Summary**，而不是某个 job 的日志页。构建成功后，摘要中的 **IPA 下载** 会直接链接到产物 ZIP；也可在总览底部的 **Artifacts** 下载 `ios-unsigned-<run_id>-<run_attempt>`，解压后取得 `.ipa`、校验文件和 `metadata.json`。
+- `ios-diagnostics-*` 只有诊断日志，不是 IPA。当前尝试失败或取消时，摘要会明确说明没有上传 IPA。
+- 标签触发且 `release` job 成功后，IPA 同时出现在仓库 **Releases → 对应版本 → Assets**；手动运行不创建 Release，即使运行时选择的是标签。
+- 以当前产物列表为准：旧日志中的“uploaded successfully”只证明当时上传成功；产物被清理后，旧下载链接可能返回 404，需要重新完成一次构建。
+
+上传与下载 Actions 均固定为 Node 24 版本。GitHub 的 macOS arm64 容量提示仅说明排队可能延长，不代表编译或上传失败；排队时无需反复取消重跑。
+
 ## 版本规则
 
 | 项目 | 来源 |

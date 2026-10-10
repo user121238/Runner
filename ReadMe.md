@@ -1,4 +1,29 @@
-# Runner APP 需求规格说明书 (草案 v1.3)
+# Runner
+
+离线跑步应用：运动会话、课程节拍、GPS 轨迹、计步、配速和历史记录。手表连接及其蓝牙、加密桥接代码已移除。
+
+- Android：API 29+，保留硬件计步与加速度兜底。
+- iOS：15.0+，接入 CoreLocation、系统计步与后台音频节拍。外部音乐应用仍使用 iOS 系统播放控件。
+- 数据：公开 NuGet 的 LiteDB，沿用 `runner.db` 和原课程/记录集合，不依赖开发者本机包源。
+
+## iOS 版本发布
+
+推送版本标签，例如 `v1.0.0` 或 `0.0.1-alpha`，GitHub Actions 会构建设备版 **无签名 IPA**，创建对应 Release 并上传 IPA 与 SHA-256 文件。预发布后缀保留在产物名中并标记 Pre-release，应用显示版本使用数字三段，构建号取 Actions run number。手动运行工作流只生成构建产物，不创建 Release。
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+无签名 IPA 留给后续自签安装；构建不需要 Apple 证书 secrets。
+
+详见 [iOS 构建与发布](doc/IOS_RELEASE.md)、[当前路线图](doc/ROADMAP.md)、[回归测试](tests/README.md)。
+
+---
+
+# 历史需求草案 (v1.3)
+
+以下保留原始需求讨论，不代表当前平台范围与已实现功能；当前状态以以上说明和路线图为准。
 
 ## 1. 核心技术选型更新
 

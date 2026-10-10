@@ -8,8 +8,10 @@
 
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="15">
+            <Label Text="{Binding DiagnosticNotice}" />
+            <Label Text="{Binding MusicControlStatus}" />
             <!--  媒体控制  -->
-            <Border Padding="15" BackgroundColor="LightGray">
+            <Border Padding="15" BackgroundColor="LightGray" IsVisible="{Binding CanControlMusic}">
                 <VerticalStackLayout Spacing="10">
                     <Label FontAttributes="Bold" FontSize="18" Text="媒体控制" />
                     <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
@@ -54,7 +56,7 @@
             </Border>
 
             <!--  传感器切换  -->
-            <Border Padding="15" BackgroundColor="LightCoral">
+            <Border Padding="15" BackgroundColor="LightCoral" IsVisible="{Binding CanSwitchStepCounter}">
                 <VerticalStackLayout Spacing="10">
                     <Label FontAttributes="Bold" FontSize="18" Text="传感器切换" />
                     <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">

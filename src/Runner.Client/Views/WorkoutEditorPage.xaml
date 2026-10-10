@@ -51,6 +51,8 @@
                     <Label Grid.Column="1" Style="{StaticResource Hint}" Text="按顺序执行，每轮重复" />
                 </Grid>
 
+                <Label Style="{StaticResource Hint}" Text="{Binding MusicControlStatus}" />
+
                 <VerticalStackLayout BindableLayout.ItemsSource="{Binding Stages}" Spacing="10">
                     <BindableLayout.ItemTemplate>
                         <DataTemplate x:DataType="vm:StageEditModel">
@@ -122,7 +124,8 @@
                                         </Border>
                                     </Grid>
 
-                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12"
+                                          IsVisible="{Binding Source={RelativeSource AncestorType={x:Type vm:WorkoutEditorPageViewModel}}, Path=CanControlMusic}">
                                         <VerticalStackLayout Spacing="2" VerticalOptions="Center">
                                             <Label Style="{StaticResource Body}" Text="进入时切下一首歌" />
                                             <Label Style="{StaticResource CardDetail}" Text="用换歌提醒你：节奏变了" />

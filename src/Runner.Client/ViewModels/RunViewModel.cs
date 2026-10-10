@@ -5,7 +5,7 @@ using Prism.Mvvm;
 using Prism.Navigation;
 using Prism.Navigation.Regions;
 using Prism.Services;
-using Runner.Business.Platforms.Android.Session;
+using Runner.Business.Session;
 using Runner.Core.Session;
 using Runner.Core.Workouts;
 

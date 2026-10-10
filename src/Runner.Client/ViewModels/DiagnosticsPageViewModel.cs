@@ -2,9 +2,8 @@
 using Prism.Mvvm;
 using Prism.Navigation;
 using Runner.Business.Location;
-using Runner.Business.Platforms.Android.Media;
-using Runner.Business.Platforms.Android.Session;
-using Runner.Business.Platforms.Android.StepCounter;
+using Runner.Business.Session;
+using Runner.Business.StepCounter;
 
 namespace Runner.Client.ViewModels;
 
@@ -16,6 +15,7 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
     private IStepCounter? _stepCounter;
     private ILocationTracker? _locationTracker;
     private bool _isPedometerActive;
+    private bool? _lastCanModifySources;
 
     private int _stepCount;
     private double _stepFrequency;
@@ -28,19 +28,21 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
     {
         _host = host;
 
-        NextTrackCommand = new DelegateCommand(() => MediaController.NextTrack(Platform.AppContext));
-        PreviousTrackCommand = new DelegateCommand(() => MediaController.PreviousTrack(Platform.AppContext));
-        PlayPauseCommand = new DelegateCommand(() => MediaController.PlayPause(Platform.AppContext));
-        StartTickCommand = new DelegateCommand(() => _host.Metronome.Start(MetronomeCadence));
-        StopTickCommand = new DelegateCommand(_host.Metronome.Stop);
-        StartPedometerCommand = new DelegateCommand(StartPedometer);
-        StopPedometerCommand = new DelegateCommand(StopPedometer);
-        ResetStepCountCommand = new DelegateCommand(ResetStepCount);
-        SwitchToAccelerometerCommand = new AsyncDelegateCommand(() => SwitchStepCounterAsync(forceAccelerometer: true));
-        SwitchToHardwareCommand = new AsyncDelegateCommand(() => SwitchStepCounterAsync(forceAccelerometer: false));
-        StartGpsTrackingCommand = new AsyncDelegateCommand(StartGpsTrackingAsync);
-        StopGpsTrackingCommand = new DelegateCommand(StopGpsTracking);
-        ResetGpsDistanceCommand = new DelegateCommand(ResetGpsDistance);
+        NextTrackCommand = new DelegateCommand(() => RunDiagnostic(_host.NextTrack), CanUseMusic);
+        PreviousTrackCommand = new DelegateCommand(() => RunDiagnostic(_host.PreviousTrack), CanUseMusic);
+        PlayPauseCommand = new DelegateCommand(() => RunDiagnostic(_host.PlayPause), CanUseMusic);
+        StartTickCommand = new DelegateCommand(() => RunDiagnostic(() => _host.Metronome.Start(MetronomeCadence)), CanModify);
+        StopTickCommand = new DelegateCommand(() => RunDiagnostic(_host.Metronome.Stop), CanModify);
+        StartPedometerCommand = new DelegateCommand(() => RunDiagnostic(StartPedometer), CanModify);
+        StopPedometerCommand = new DelegateCommand(() => RunDiagnostic(StopPedometer), CanModify);
+        ResetStepCountCommand = new DelegateCommand(() => RunDiagnostic(ResetStepCount), CanModify);
+        SwitchToAccelerometerCommand = new AsyncDelegateCommand(() => SwitchStepCounterAsync(forceAccelerometer: true), CanSwitchSource);
+        SwitchToHardwareCommand = new AsyncDelegateCommand(() => SwitchStepCounterAsync(forceAccelerometer: false), CanSwitchSource);
+        StartGpsTrackingCommand = new AsyncDelegateCommand(StartGpsTrackingAsync, CanModify);
+        StopGpsTrackingCommand = new DelegateCommand(() => RunDiagnostic(StopGpsTracking), CanModify);
+        ResetGpsDistanceCommand = new DelegateCommand(() => RunDiagnostic(ResetGpsDistance), CanModify);
+        _host.Updated += OnHostUpdated;
+        RefreshAvailability();
     }
 
     public DelegateCommand NextTrackCommand { get; }
@@ -63,6 +65,46 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
     public double GpsDistance { get => _gpsDistance; private set => SetProperty(ref _gpsDistance, value); }
     public double GpsSpeed { get => _gpsSpeed; private set => SetProperty(ref _gpsSpeed, value); }
     public string GpsStatus { get => _gpsStatus; private set => SetProperty(ref _gpsStatus, value); }
+    public bool CanControlMusic => _host.CanControlMusic;
+    public bool CanSwitchStepCounter => _host.CanSwitchStepCounter;
+    public string MusicControlStatus => _host.MusicControlStatus;
+    public string DiagnosticNotice => _host.IsSessionActive
+        ? "运动进行中：诊断页仅查看数据，结束运动后再操作来源。"
+        : "手动操作只用于排障，开始运动后由会话统一管理来源。";
+
+    private bool CanModify() => _host.IsInitialized && !_host.IsSessionActive;
+    private bool CanUseMusic() => CanModify() && _host.CanControlMusic;
+    private bool CanSwitchSource() => CanModify() && _host.CanSwitchStepCounter;
+
+    private void RunDiagnostic(Action action)
+    {
+        if (!CanModify()) return;
+        try { action(); }
+        catch (Exception ex) { GpsStatus = $"诊断操作失败: {ex.Message}"; }
+    }
+
+    private void OnHostUpdated() => MainThread.BeginInvokeOnMainThread(RefreshAvailability);
+
+    private void RefreshAvailability()
+    {
+        bool canModify = CanModify();
+        if (_lastCanModifySources == canModify) return;
+        _lastCanModifySources = canModify;
+        RaisePropertyChanged(nameof(DiagnosticNotice));
+        NextTrackCommand.RaiseCanExecuteChanged();
+        PreviousTrackCommand.RaiseCanExecuteChanged();
+        PlayPauseCommand.RaiseCanExecuteChanged();
+        StartTickCommand.RaiseCanExecuteChanged();
+        StopTickCommand.RaiseCanExecuteChanged();
+        StartPedometerCommand.RaiseCanExecuteChanged();
+        StopPedometerCommand.RaiseCanExecuteChanged();
+        ResetStepCountCommand.RaiseCanExecuteChanged();
+        SwitchToAccelerometerCommand.RaiseCanExecuteChanged();
+        SwitchToHardwareCommand.RaiseCanExecuteChanged();
+        StartGpsTrackingCommand.RaiseCanExecuteChanged();
+        StopGpsTrackingCommand.RaiseCanExecuteChanged();
+        ResetGpsDistanceCommand.RaiseCanExecuteChanged();
+    }
 
     public void OnNavigatedTo(INavigationParameters parameters) => _ = InitializeAsync();
 
@@ -79,6 +121,7 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
             GpsStatus = $"初始化失败: {ex.Message}";
         }
         BindSources();
+        RefreshAvailability();
     }
 
     private void BindSources()
@@ -120,7 +163,11 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
         }
     }
 
-    public void Destroy() => UnbindSources();
+    public void Destroy()
+    {
+        _host.Updated -= OnHostUpdated;
+        UnbindSources();
+    }
 
     #region 计步器
 
@@ -135,9 +182,7 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
         {
             _stepCounter.Start();
             _isPedometerActive = true;
-            PedometerStatus = _stepCounter is HardwareStepCounter
-                ? "运行中（硬件可能先确认多步再上报）"
-                : "运行中（加速度兜底，精度需实测）";
+            PedometerStatus = $"运行中（{_host.StepCounterStatus}）";
         }
         catch (Exception ex)
         {
@@ -169,6 +214,7 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
 
     private async Task SwitchStepCounterAsync(bool forceAccelerometer)
     {
+        if (!CanSwitchSource()) return;
         if (_isPedometerActive)
         {
             _stepCounter?.Stop();
@@ -200,6 +246,7 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
 
     private async Task StartGpsTrackingAsync()
     {
+        if (!CanModify()) return;
         if (_locationTracker == null)
         {
             GpsStatus = _host.LocationStatus;

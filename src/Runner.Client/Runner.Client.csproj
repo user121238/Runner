@@ -1,15 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>net10.0-android;</TargetFrameworks>
-        <!--<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">$(TargetFrameworks);net10.0-windows10.0.19041.0</TargetFrameworks>-->
-
-        <!-- Note for MacCatalyst:
-		The default runtime is maccatalyst-x64, except in Release config, in which case the default is maccatalyst-x64;maccatalyst-arm64.
-		When specifying both architectures, use the plural <RuntimeIdentifiers> instead of the singular <RuntimeIdentifier>.
-		The Mac App Store will NOT accept apps with ONLY maccatalyst-arm64 indicated;
-		either BOTH runtimes must be indicated or ONLY macatalyst-x64. -->
-        <!-- For example: <RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers> -->
+        <TargetFrameworks>net10.0-android</TargetFrameworks>
+        <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('osx'))">$(TargetFrameworks);net10.0-ios</TargetFrameworks>
+        <!-- CI 只还原所选移动平台；不把 TargetFrameworks 全局覆盖传递给纯 .NET Core 项目。 -->
+        <TargetFrameworks Condition="'$(RunnerTargetFrameworks)' != ''">$(RunnerTargetFrameworks)</TargetFrameworks>
 
         <OutputType>Exe</OutputType>
         <RootNamespace>Runner.Client</RootNamespace>
@@ -31,12 +26,9 @@
         <!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
         <WindowsPackageType>None</WindowsPackageType>
 
-        <!--<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
-		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">15.0</SupportedOSPlatformVersion>-->
+        <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">15.0</SupportedOSPlatformVersion>
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">29.0</SupportedOSPlatformVersion>
         <NuGetAudit>False</NuGetAudit>
-        <!--<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
-		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>-->
     </PropertyGroup>
 
     <ItemGroup>
@@ -59,11 +51,8 @@
         <MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
     </ItemGroup>
 
-    <ItemGroup>
+    <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">
       <MauiAsset Remove="Resources\Raw\beep3.wav" />
-    </ItemGroup>
-
-    <ItemGroup>
       <AndroidResource Include="Resources\Raw\beep1.mp3" />
       <AndroidResource Include="Resources\Raw\beep2.mp3" />
       <AndroidResource Include="Resources\Raw\beep3.wav" />
@@ -78,24 +67,11 @@
     </ItemGroup>
 
     <ItemGroup>
-        <!-- 引用 DM.Maui.Framework 包 -->
-        <PackageReference Include="DM.Maui.Framework.Core" />
-        <PackageReference Include="DM.Maui.Framework.Data" />
-        <PackageReference Include="DM.Maui.Framework.Localization" />
-        <PackageReference Include="DM.Maui.Framework.UI" />
-        <PackageReference Include="DM.Maui.Framework.Abstractions" />
-    </ItemGroup>
-
-    <ItemGroup>
       <ProjectReference Include="..\Runner.Business\Runner.Business.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
-      <AndroidJavaSource Include="Platforms\Android\java\**\*.java" />
-      <AndroidNativeLibrary Include="Platforms\Android\libs\arm64-v8a\libdevice-encrypt.so" Link="libs\arm64-v8a\libdevice-encrypt.so">
-        <Abi>arm64-v8a</Abi>
-        <Kind>Dynamic</Kind>
-      </AndroidNativeLibrary>
+    <ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+      <BundleResource Include="Platforms\iOS\PrivacyInfo.xcprivacy" LogicalName="PrivacyInfo.xcprivacy" />
     </ItemGroup>
 
     <ItemGroup>

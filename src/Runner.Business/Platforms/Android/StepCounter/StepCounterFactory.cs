@@ -1,5 +1,6 @@
 using Android.Content;
 using Android.Hardware;
+using Runner.Business.StepCounter;
 using System.Diagnostics;
 
 namespace Runner.Business.Platforms.Android.StepCounter

@@ -2,6 +2,7 @@
 using Prism.Commands;
 using Prism.Mvvm;
 using Prism.Navigation;
+using Runner.Business.Session;
 using Runner.Business.Services.Workouts;
 using Runner.Core.Workouts;
 
@@ -18,10 +19,12 @@ public class WorkoutEditorPageViewModel : BindableBase, INavigatedAware
     private int _rounds = 1;
     private string _message = "";
 
-    public WorkoutEditorPageViewModel(WorkoutStore store, INavigationService navigation)
+    public WorkoutEditorPageViewModel(WorkoutStore store, INavigationService navigation, IRunPlatform platform)
     {
         _store = store;
         _navigation = navigation;
+        CanControlMusic = platform.CanControlMusic;
+        MusicControlStatus = platform.MusicControlStatus;
         IncreaseRoundsCommand = new DelegateCommand(() => Rounds = Math.Min(MaxRounds, Rounds + 1));
         DecreaseRoundsCommand = new DelegateCommand(() => Rounds = Math.Max(1, Rounds - 1));
         AddStageCommand = new DelegateCommand(() => AddStage(new StageEditModel()));
@@ -36,6 +39,8 @@ public class WorkoutEditorPageViewModel : BindableBase, INavigatedAware
     public AsyncDelegateCommand SaveCommand { get; }
 
     public ObservableCollection<StageEditModel> Stages { get; } = new();
+    public bool CanControlMusic { get; }
+    public string MusicControlStatus { get; }
 
     public string Title => _planId == 0 ? "新建课程" : "编辑课程";
 

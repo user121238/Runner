@@ -17,13 +17,6 @@
 		<PackageVersion Include="Prism.Maui" Version="9.0.537" />
 		<PackageVersion Include="Prism.DryIoc.Maui" Version="9.0.537" />
 
-
-		<!--框架	-->
-		<PackageVersion Include="DM.Maui.Framework.Core" Version="1.0.4" />
-		<PackageVersion Include="DM.Maui.Framework.Data" Version="1.0.4" />
-		<PackageVersion Include="DM.Maui.Framework.Localization" Version="1.0.4" />
-		<PackageVersion Include="DM.Maui.Framework.UI" Version="1.0.4" />
-		<PackageVersion Include="DM.Maui.Framework.Abstractions" Version="1.0.4" />
 	</ItemGroup>
 
 </Project>

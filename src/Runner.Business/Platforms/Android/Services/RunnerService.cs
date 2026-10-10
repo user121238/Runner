@@ -14,6 +14,7 @@ namespace Runner.Business.Platforms.Android.Services
 
         private const int NOTIFICATION_ID = 1001;
         private const string CHANNEL_ID = "runner_channel";
+        public const string UseLocationExtra = "runner.use_location";
 
         /// <summary>通知小图标的资源 id，由应用在启动时指定（资源在应用工程里）；默认用系统图标兜底。</summary>
         public static int SmallIconResourceId { get; set; } = global::Android.Resource.Drawable.IcMenuCompass;
@@ -41,9 +42,17 @@ namespace Runner.Business.Platforms.Android.Services
 
 
             // 3. 启动前台服务
-            StartForeground(NOTIFICATION_ID, notification);
+            // 无定位授权时仍可只运行节拍/计步；不要让 manifest 的全部类型触发位置权限异常。
+            var serviceType = ForegroundService.TypeMediaPlayback;
+            bool locationGranted = CheckSelfPermission(global::Android.Manifest.Permission.AccessFineLocation) == global::Android.Content.PM.Permission.Granted
+                || CheckSelfPermission(global::Android.Manifest.Permission.AccessCoarseLocation) == global::Android.Content.PM.Permission.Granted;
+            var locations = GetSystemService(LocationService) as global::Android.Locations.LocationManager;
+            if (intent?.GetBooleanExtra(UseLocationExtra, false) == true && locationGranted && locations?.IsLocationEnabled == true)
+                serviceType |= ForegroundService.TypeLocation;
+            StartForeground(NOTIFICATION_ID, notification, serviceType);
 
-            return StartCommandResult.Sticky;
+            // 会话在应用内存中；进程消失后不重建一个没有会话的“跑步中”通知。
+            return StartCommandResult.NotSticky;
 
         }
 

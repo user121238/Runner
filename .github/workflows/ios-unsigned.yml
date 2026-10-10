@@ -1,0 +1,165 @@
+name: iOS unsigned IPA
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - '[0-9]*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version such as 1.2.3 or 0.0.1-alpha; manual runs only upload artifacts'
+        required: true
+        default: '1.0.0'
+        type: string
+
+permissions:
+  contents: read
+
+# Serialize repeated runs for the same ref; never cancel an in-flight Release upload.
+concurrency:
+  group: ios-unsigned-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      asset_name: ${{ steps.version.outputs.asset_name }}
+      artifact_name: ios-unsigned-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Validate the release version before installing workloads
+        id: version
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == push ]]; then
+            python3 scripts/ios_release.py metadata --tag "$REF_NAME" --build-number "$BUILD_NUMBER" --github-output "$GITHUB_OUTPUT"
+          else
+            python3 scripts/ios_release.py metadata --version "$INPUT_VERSION" --build-number "$BUILD_NUMBER" --github-output "$GITHUB_OUTPUT"
+          fi
+
+      - name: Test the packaging helpers and Bash syntax
+        run: |
+          python3 -m unittest discover -s scripts/tests -v
+          bash -n scripts/build-unsigned-ipa.sh
+
+      - name: Select the pinned Xcode, never the runner default
+        env:
+          XCODE_VERSION: ${{ steps.version.outputs.xcode_version }}
+          IOS_SDK_VERSION: ${{ steps.version.outputs.ios_sdk_version }}
+        run: |
+          set -euo pipefail
+          developer_dir="/Applications/Xcode_${XCODE_VERSION}.app/Contents/Developer"
+          test -d "$developer_dir"
+          sudo xcode-select --switch "$developer_dir"
+          xcodebuild -version
+          test "$(xcrun --sdk iphoneos --show-sdk-version)" = "$IOS_SDK_VERSION"
+
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.temp }}/runner-dotnet-ios
+        with:
+          dotnet-version: ${{ steps.version.outputs.sdk_version }}
+
+      - name: Run shared logic, storage and cadence audio regression tests
+        env:
+          SDK_VERSION: ${{ steps.version.outputs.sdk_version }}
+        run: |
+          set -euo pipefail
+          test "$(dotnet --version)" = "$SDK_VERSION"
+          mkdir -p artifacts/ios/logs/tests
+          dotnet test tests/Runner.Core.Tests/Runner.Core.Tests.csproj --configuration Release \
+            --logger trx --results-directory artifacts/ios/logs/tests \
+            '-bl:artifacts/ios/logs/tests-{}.binlog' \
+            2>&1 | tee artifacts/ios/logs/tests.log
+
+      - name: Install the pinned MAUI iOS workload set
+        env:
+          SDK_VERSION: ${{ steps.version.outputs.sdk_version }}
+          WORKLOAD_VERSION: ${{ steps.version.outputs.workload_version }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/ios/logs
+          test "$(dotnet --version)" = "$SDK_VERSION"
+          dotnet workload install maui-ios --version "$WORKLOAD_VERSION" --source https://api.nuget.org/v3/index.json \
+            2>&1 | tee artifacts/ios/logs/workload-install.log
+
+      - name: Build and verify the unsigned device IPA
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
+          BUILD_NUMBER: ${{ steps.version.outputs.build_number }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: bash scripts/build-unsigned-ipa.sh "$PACKAGE_VERSION" "$BUILD_NUMBER" artifacts/ios
+
+      - name: Upload the validated IPA
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ios-unsigned-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+          path: |
+            artifacts/ios/*.ipa
+            artifacts/ios/*.ipa.sha256
+            artifacts/ios/metadata.json
+
+      - name: Keep diagnostics even when the build fails
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ios-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: ignore
+          retention-days: 7
+          path: artifacts/ios/logs/
+
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      # No checkout or build script runs in the job holding the Release write token.
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: release-assets
+
+      - name: Create the tag Release or replace its unsigned IPA on rerun
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+          IS_PRERELEASE: ${{ needs.build.outputs.prerelease }}
+          ASSET_NAME: ${{ needs.build.outputs.asset_name }}
+        working-directory: release-assets
+        run: |
+          set -euo pipefail
+          sha256sum --check "${ASSET_NAME}.sha256"
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$ASSET_NAME" "${ASSET_NAME}.sha256" --clobber
+          else
+            gh release create "$RELEASE_TAG" "$ASSET_NAME" "${ASSET_NAME}.sha256" \
+              --verify-tag --title "$RELEASE_TAG" --prerelease="$IS_PRERELEASE" \
+              --notes 'Unsigned iPhoneOS arm64 package. Re-sign with your own Apple certificate and provisioning profile before device installation. Not an App Store/TestFlight-signed build.'
+          fi

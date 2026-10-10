@@ -1,6 +1,7 @@
 using Android.Content;
 using Android.Hardware;
 using Android.OS;
+using Runner.Business.StepCounter;
 using Runner.Core.SignalProcessing;
 using Debug = System.Diagnostics.Debug;
 
@@ -19,6 +20,7 @@ public sealed class AccelerometerStepCounter : Java.Lang.Object, IStepCounter, I
 
     public event Action<int>? OnStepCountChanged;
     public event Action<double>? OnStepFrequencyChanged;
+    public event Action<string>? OnError;
 
     public void Init(Context context)
     {
@@ -72,6 +74,12 @@ public sealed class AccelerometerStepCounter : Java.Lang.Object, IStepCounter, I
 
     public void OnSensorChanged(SensorEvent? e)
     {
+        try { ProcessSensorEvent(e); }
+        catch (Exception ex) { OnError?.Invoke($"处理加速度计步数据失败: {ex.Message}"); }
+    }
+
+    private void ProcessSensorEvent(SensorEvent? e)
+    {
         if (e?.Values == null || e.Values.Count < 3) return;
         lock (_sync)
         {
@@ -104,6 +112,7 @@ public sealed class AccelerometerStepCounter : Java.Lang.Object, IStepCounter, I
         _sensor = null;
         OnStepCountChanged = null;
         OnStepFrequencyChanged = null;
+        OnError = null;
         base.Dispose();
     }
 }

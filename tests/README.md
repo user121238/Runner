@@ -1,6 +1,6 @@
 # 算法回归测试
 
-`Runner.Core.Tests` 直接通过 `ProjectReference` 测试真实的 `Runner.Core`，不复制算法，不依赖 Android、MAUI、设备、墙钟或等待。需要 .NET 10 SDK；首次运行需要还原 NuGet 测试包。
+`Runner.Core.Tests` 直接通过 `ProjectReference` 测试真实的 `Runner.Core`；另用 `Compile Link` 引用无平台依赖的生产 Store 与 PCM 节拍生成源码，验证旧数据库兼容及 iOS 循环音频。没有复制实现，也不依赖 Android、MAUI、设备、墙钟或等待。需要 .NET 10 SDK；首次运行需要还原公开 NuGet 包。
 
 ## 运行
 
@@ -19,6 +19,9 @@ rtk proxy dotnet test 'D:\Eric\Code\Runner\tests\Runner.Core.Tests\Runner.Core.T
 TRX、Cobertura 和唯一名称的 MSBuild binlog 全部写入已忽略的 `artifacts` 目录。仅测试项目及 Core 会构建，不需要安装移动平台 workload。
 
 ## 验证范围
+
+- 持久化：原 `ActivityRecord` / `WorkoutPlan` 集合名、旧记录缺少距离序列时的读取、真实 LiteDB 字节重开、整数 ID 回填/续号、更新不重复、删除隔离及 `Changed` 通知；各测试隔离映射器缓存。
+- PCM 节拍：原始采样保留、拍间静音、按 SPM 生成准确帧数、奇数长度 RIFF 块、非法步频、截短/非 PCM 输入；不依赖设备音频输出。
 
 - 计步累计：逐步事件、硬件累计基线、硬件重启、重置后下一步为 1、暂停期间步数排除。
 - 步频：90/120/180/210/240 SPM，真实批量增量，8 秒窗口和 3 秒停止超时，重复/倒序时间戳，重置，以及定时读取与硬件回调交错时的零计数基线保留。

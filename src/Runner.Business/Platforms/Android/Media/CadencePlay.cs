@@ -1,6 +1,7 @@
 ﻿using Android.Media;
 using Android.OS;
 using Java.Lang;
+using Runner.Business.Media;
 using Application = Android.App.Application;
 using Debug = System.Diagnostics.Debug;
 using Math = System.Math;
@@ -10,7 +11,7 @@ namespace Runner.Business.Platforms.Android.Media
     /// <summary>
     /// 步频节拍播放器：用 SoundPool 与音乐混音，按绝对时间排程避免累积漂移。
     /// </summary>
-    public class CadencePlay : IDisposable
+    public class CadencePlay(int soundResourceId) : ICadencePlayer
     {
         private const int MAX_STREAMS = 1;
 
@@ -24,6 +25,10 @@ namespace Runner.Business.Platforms.Android.Media
         private long _nextTickTime;
         private bool _running;
         private int _intervalMs;
+
+        public event Action<string>? OnError;
+
+        public Task InitializeAsync() => Task.Run(() => Init(soundResourceId));
 
         /// <summary>创建 SoundPool 并加载节拍音。</summary>
         public void Init(int soundResourceId)
@@ -99,6 +104,7 @@ namespace Runner.Business.Platforms.Android.Media
 
         private void OnLoadComplete(object? sender, SoundPool.LoadCompleteEventArgs e)
         {
+            if (e.Status != 0) OnError?.Invoke($"加载节拍音失败: {e.Status}");
             if (e.SampleId == _soundId && e.Status == 0)
             {
                 _isLoaded = true;
@@ -119,6 +125,7 @@ namespace Runner.Business.Platforms.Android.Media
                 }
                 _isLoaded = false;
             }
+            OnError = null;
         }
     }
 }

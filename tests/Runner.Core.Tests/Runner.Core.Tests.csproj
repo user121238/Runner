@@ -12,9 +12,14 @@
     <PackageReference Include="MSTest.TestFramework" />
     <PackageReference Include="MSTest.TestAdapter" />
     <PackageReference Include="coverlet.collector" PrivateAssets="all" />
+    <PackageReference Include="LiteDB" />
     <ProjectReference Include="../../src/Runner.Core/Runner.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+    <!-- 直接链接不依赖平台的生产 Store，验证旧数据库兼容；不复制实现。 -->
+    <Compile Include="../../src/Runner.Business/Services/Activities/ActivityStore.cs" Link="Storage/ActivityStore.cs" />
+    <Compile Include="../../src/Runner.Business/Services/Workouts/WorkoutStore.cs" Link="Storage/WorkoutStore.cs" />
+    <Compile Include="../../src/Runner.Business/Media/PcmWaveLoop.cs" Link="Media/PcmWaveLoop.cs" />
   </ItemGroup>
 </Project>

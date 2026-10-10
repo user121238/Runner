@@ -1,8 +1,12 @@
 # Runner 路线图
 
-更新：2026-10-10。对照 `doc/Runner.md`（需求规格 v1.3）盘点现状，并排定后续阶段。手表蓝牙线冻结，范围见文末。
+更新：2026-10-10。对照 `doc/Runner.md`（需求规格 v1.3）盘点现状，并排定后续阶段。手表蓝牙功能已移除，范围见文末。
 
 ## 现状结论
+
+2026-10-10 跨平台与发布更新：手表相关实现及本机私有 NuGet 依赖已移除；Android / iOS 共用运动会话与课程逻辑，iOS 新增 CoreLocation、系统计步和循环音频节拍。推送版本标签（如 `v1.2.3` 或 `0.0.1-alpha`，`v` 可选）将运行回归测试、构建无签名 IPA 并发布 GitHub Release；预发布标签生成 Pre-release，手动运行仅保留构建产物，见 `IOS_RELEASE.md`。iOS 外部播放器控制交由系统控件；无定位且当前不播节拍时，后台推进受系统挂起限制。托管编译与单元测试不替代 Mac AOT 打包、iPhone 授权/锁屏/来电验收。
+
+以下较早的阶段统计为历史进展记录。
 
 已完成并经真机验证的是算法与传感器接入：步频（硬件 / 加速度两档）、GPS 距离与速度、单调时钟、168 个回归用例（Core 行覆盖 100%）。产品层——运动会话、跑步界面、设置、提醒、记录、轨迹——尚未开始。按需求条目约完成四分之一，按工程难度已过半。
 
@@ -19,7 +23,7 @@
 | 2.2 阈值 / 语音 / 变调 / 震动 / 开关 | 不做（用户决定） | 步频偏离提醒已撤回；提醒改为课程节点切歌 |
 | 2.3 地图 | 轨迹草图（P5） | 记录详情用 `GraphicsView` 画轨迹；真地图不接 |
 | 3 极简跑步主界面 | 完成（P2） | `RunView` 四个大数字 + 主按钮；底栏在 Prism 区域内切换首页 / 记录 / 设置；诊断页独立 |
-| 4 LiteDB Workouts / Activities / Settings | 完成（Settings 不再需要） | `WorkoutPlan`、`ActivityRecord` 走 DM `IRepository<T>` |
+| 4 LiteDB Workouts / Activities / Settings | 完成（Settings 不再需要） | `WorkoutStore`、`ActivityStore` 直接使用 LiteDB，保留原数据库与集合 |
 | 时长 | 完成（P1） | `RunSession.Elapsed` 只累计跑动区间 |
 
 ## 设计决定
@@ -28,8 +32,8 @@
 - 一个 Start / Pause / Stop 驱动 GPS、计步、节拍器、前台服务；前台服务随会话起停。
 - 可测逻辑放 `Runner.Core`（会话状态机、课程推进），Android 绑定放 `Runner.Business`，与现有分层一致，直接进现有 MSTest 项目。
 - Client 导航用 Prism.Maui（9.0.537 + Prism.DryIoc.Maui）：根页以 `RegionManager` 区域承载 `ContentView` 切换，需要独立一屏的用 `INavigationService` 推 `ContentPage`，根为 `NavigationPage/MainPage`。VM 继承 `BindableBase`，命令用 Prism 的 DelegateCommand / AsyncDelegateCommand，不引入 CommunityToolkit.Mvvm。
-- 持久化走 DM 的 `IRepository<T>`：DM 1.0.4 起 `AddLiteDbDataAccess` 注册开放泛型 `IRepository<>` 单例，应用级单例可直接注入；框架随需求演进（源码 `D:\Eric\Code\DM.Maui.Framework`，Release 构建自动打包到 LocalNuGet）。
-- 持久化复用 `DM.Maui.Framework.Data` 的 `IRepository<T>`、`IUnitOfWork`、`BaseEntity`、`LiteDbRepository<T>`，不自写 LiteDB 层。
+- 持久化直接使用公开包 LiteDB 5.0.21：应用级单例 `ILiteDatabase` 以 Shared 模式打开 `runner.db`，`WorkoutStore`、`ActivityStore` 分别使用固定集合名 `WorkoutPlan`、`ActivityRecord`。这是旧仓储的实际集合名，整数 ID、课程阶段、轨迹、步频与配速采样格式均不变，无需清库或迁移。
+- 已移除依赖本地包源的 DM 仓储框架；数据层不再需要开发者机器上的 LocalNuGet，云端构建可从公开源还原。
 - 地图 v1 用 `GraphicsView` 画轨迹折线：离线、零依赖；保留 `IMapProvider` 作为将来接 SDK 的切换点。真地图目前没有免费可用渠道，不接。
 - 现有调试页保留为设置中的"诊断"入口，不删。
 - 一个文件一个类型：接口、实现、枚举、实体各自独立文件。
@@ -55,7 +59,7 @@
 - 首页：时长 / 距离 / 实际步频 / 目标步频四个大数字 + 一个主按钮（开始 / 暂停 / 继续）+ 进行中才出现的结束键，黑底白字；无计步来源时步频显示"—"。
 - `RunSessionHost`（Business）成为应用级单例：权限申请、GPS / 计步 / 节拍器来源与会话控制器的唯一所有者，首页与诊断页都只消费它，不各自建监听器。权限与来源在首次点击「开始」时申请、创建（2026-10-10 改，见 P6），首页显示不依赖它们。
 - 记录页为占位（P4 填充）；设置页只有"诊断"入口（P3 填充）；"连接手表跑步"入口移除。
-- DM.Maui.Framework.Core 的 Shell / 导航只为冻结的手表页面保留编译；DM.Data 继续用。
+- 当时为手表页面保留的 DM Shell / 导航及数据包已在后续清理中移除；当前导航只使用 Prism，持久化直接使用 LiteDB。
 - 真机：Debug 包已安装并启动无崩溃（包名实际为 Manifest 的 `com.eric.runner`，非 csproj 的 ApplicationId）；当时手机锁屏且 MIUI 拒绝 adb 注入按键，界面截图待解锁后补。
 
 ### P3 设置与提醒 — 已撤回（2026-10-09）
@@ -67,7 +71,7 @@
 #### 课程 — 代码完成（2026-10-09），待真机验收
 
 - `Runner.Core.Workouts`：`WorkoutPlan`（名称、轮数、阶段列表）、`WorkoutStage`（步频 0–300，0 = 不播节拍；结束条件 时长秒 / 距离米 二选一；进入时是否切歌）、`WorkoutRunner` 用会话的跑动时长与距离推进阶段——边界按计划值累加不带入采样延迟，一次更新可跨多阶段，轮次展开。11 个用例。
-- 持久化：`WorkoutStore` 走 DM 的 `IRepository<WorkoutPlan>`；DM 1.0.4 在 `AddLiteDbDataAccess` 里补了开放泛型 `IRepository<>` 单例注册（`LiteDbRepository<T>` 只持有共享模式的单例 `ILiteDatabase`）。
+- 持久化：`WorkoutStore` 直接使用共享模式的单例 `ILiteDatabase`，保存前校验课程，新增时由 LiteDB 回填整数 ID；更新、删除后触发 `Changed`。
 - 会话：`RunSessionController.StartAsync(WorkoutPlan?)`，进入阶段时按步频起停节拍器、按需 `MediaController.NextTrack` 切歌；课程完成停节拍，会话继续；自由跑不播节拍。
 - 界面：底栏加「课程」；课程列表（新建 / 编辑 / 删除，删除前确认）与编辑页（名称、轮数、阶段：步频、时长分钟 / 距离米、切歌开关）；首页空闲时选课程或自由跑，进行中显示「课程 · 第 r/R 轮 · 阶段 i/n · 剩 x」。
 - 真机验收：法特莱克（2 分钟 180 / 1 分钟 120 切歌 × N 轮）节点准时切节拍与切歌；暂停不计入阶段时长；距离阶段按 GPS 距离推进。
@@ -75,7 +79,7 @@
 #### 记录 — 代码完成（2026-10-09），待真机验收
 
 - `Runner.Core.Activities`：`ActivityRecord`（起止时间、时长、距离、步数、平均步频、均速、课程名、轨迹点、步频采样）由已结束的会话生成；短于 5 秒的会话不落盘。3 个用例。
-- `ActivityStore` 走 DM `IRepository<ActivityRecord>`；`RunSessionController.Stopped` 事件 → `RunSessionHost` 落盘并提示"记录已保存"。
+- `ActivityStore` 直接使用同一 `ILiteDatabase` 的 `ActivityRecord` 集合；`RunSessionController.Stopped` 事件 → `RunSessionHost` 落盘并提示"记录已保存"。
 - 记录页：按时间倒序列表（日期、公里、时长、均步频、课程名），点开详情，删除前确认；详情页展示指标与轨迹草图。
 - `Product`、`User` 框架示例遗留已删除。
 
@@ -105,9 +109,13 @@
 - `ActivityRecord.DistanceSamples` 随记录落盘，详情页据此重算最快 / 最慢；旧记录显示 —。
 - 界面：跑动中 2×2（距离 / 配速、步频 / 目标步频）；结束后 2×3（距离 / 平均配速 / 均步频、最快 / 最慢配速 / 步数）；记录列表与首页「上次跑步」卡用配速替代 km/h；详情页六格改为时长 / 平均 / 均步频、最快 / 最慢 / 步数，均速与轨迹点数退到页脚。
 
-## 冻结范围：手表蓝牙
+## 已移除：手表蓝牙（2026-10-10）
 
-以下代码保留并继续编译，不投入：`Services/Ble/*`（`WatchBleService` 系列、`WatchRfcommService`、`WatchAuthService`、`DeviceEncryptInterop`、`IWatchBleService`）、`Models/WatchBle/*`、`Services/Database/MiHealthDataReader`、`WatchWorkoutPage` / `WatchWorkoutViewModel`、`BlePermissionHelper`、`Platforms/Android/java` 与 `libs` 原生库、Manifest 中的 `BLUETOOTH_*` 权限、`MauiProgram` 中的 BLE 注册。
+删除手表 BLE / RFCOMM 通信、认证与加密封装、手表协议模型、小米运动健康数据库读取、手表页面与 ViewModel、蓝牙权限回调、Java 桥接和原生加密库；同时移除 Manifest 中的蓝牙权限、启动注册及对应构建资源引用。不再保留隐藏入口或继续编译手表功能。
+
+手机自身的 GPS、计步、节拍器、课程、跑步记录和轨迹草图继续保留；已有 `runner.db` 的课程与记录沿用原集合及 ID。
+
+数据兼容性由 6 条 `StoreCompatibilityTests` 回归验证：测试链接实际 Store 源码，使用真实 LiteDB 数据库字节重开，覆盖旧记录缺少配速采样字段、原集合名、整数 ID 回填与续号、更新 / 排序 / 删除及校验失败不写入。
 
 ## 过期文档
 

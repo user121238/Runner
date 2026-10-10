@@ -140,7 +140,6 @@
                                     <Label.Triggers>
                                         <DataTrigger Binding="{Binding IsSelected}" TargetType="Label" Value="True">
                                             <Setter Property="TextColor" Value="{StaticResource Accent}" />
-                                            <Setter Property="FontFamily" Value="OpenSansSemibold" />
                                         </DataTrigger>
                                     </Label.Triggers>
                                 </Label>
@@ -149,16 +148,16 @@
                     </CollectionView.ItemTemplate>
                 </CollectionView>
 
-                <Border Style="{StaticResource Card}">
+                <!--  固定高度、三行恒定：切换课程时卡片不变高，页面不重排，顶部的卡不抖  -->
+                <Border HeightRequest="128" Style="{StaticResource Card}">
                     <VerticalStackLayout Spacing="6">
-                        <Label Style="{StaticResource CardTitle}" Text="{Binding SummaryTitle}" />
-                        <Label Style="{StaticResource CardDetail}" Text="{Binding SummaryDetail}" />
+                        <Label LineBreakMode="TailTruncation" Style="{StaticResource CardTitle}" Text="{Binding SummaryTitle}" />
+                        <Label LineBreakMode="TailTruncation" Style="{StaticResource CardDetail}" Text="{Binding SummaryDetail}" />
                         <Label Margin="0,6,0,0"
                                FontSize="14"
-                               IsVisible="{Binding HasPlan}"
                                LineBreakMode="TailTruncation"
                                LineHeight="1.35"
-                               MaxLines="3"
+                               MaxLines="2"
                                Style="{StaticResource Body}"
                                Text="{Binding SummaryStages}" />
                     </VerticalStackLayout>

@@ -22,7 +22,6 @@ public class RunViewModel : BindableBase, IRegionAware
     private readonly RunSessionHost _host;
     private readonly IPageDialogService _dialogs;
     private readonly INavigationService _navigation;
-    private WorkoutChoice? _selectedChoice;
     private WorkoutPlan? _activePlan;
     private int _lastRunId;
 
@@ -114,7 +113,6 @@ public class RunViewModel : BindableBase, IRegionAware
     public string SummaryTitle { get => _summaryTitle; private set => SetProperty(ref _summaryTitle, value); }
     public string SummaryDetail { get => _summaryDetail; private set => SetProperty(ref _summaryDetail, value); }
     public string SummaryStages { get => _summaryStages; private set => SetProperty(ref _summaryStages, value); }
-    public bool HasPlan => _selectedChoice?.Plan != null;
 
     // ---- 空闲时的顶部：今天的日期与上次跑步 ----
     public bool ShowIdleHeader { get => _showIdleHeader; private set => SetProperty(ref _showIdleHeader, value); }
@@ -196,15 +194,14 @@ public class RunViewModel : BindableBase, IRegionAware
     {
         if (choice == null) return;
         foreach (var c in Choices) c.IsSelected = ReferenceEquals(c, choice);
-        _selectedChoice = choice;
         _host.SelectedWorkout = choice.Plan;
         _host.PreferredWorkoutId = choice.Plan?.Id ?? 0;
 
+        // 摘要卡三行恒定（自由跑也有第三行）：切换时卡片高度不变，页面不重排
         var plan = choice.Plan;
         SummaryTitle = choice.Name;
-        SummaryDetail = plan == null ? "不播节拍，只记录时长、距离与步频" : WorkoutListItem.Describe(plan);
-        SummaryStages = plan == null ? "" : WorkoutListItem.DescribeStages(plan);
-        RaisePropertyChanged(nameof(HasPlan));
+        SummaryDetail = plan == null ? "不播节拍，按自己的节奏跑" : WorkoutListItem.Describe(plan);
+        SummaryStages = plan == null ? "记录时长、距离与步频" : WorkoutListItem.DescribeStages(plan);
         Refresh();
     }
 

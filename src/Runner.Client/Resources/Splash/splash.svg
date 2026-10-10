@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!-- 启动屏：同一个 R 标记，透明底，由 csproj 的 Color 铺近黑底色；Android 12+ 会把它放进系统启动圆形区域 -->
+<!--
+  启动屏：同一个 R 标记，透明底，由 csproj 的 Color 铺近黑底色。
+  Android 12+ 把它放进系统开屏的 192dp 圆槽并按圆裁剪：标记放大 1.5 倍后最远点约在半径 85% 处，仍在圆内不被裁。
+-->
 <svg width="456" height="456" viewBox="0 0 456 456" version="1.1" xmlns="http://www.w3.org/2000/svg">
-    <g fill="none" stroke="#00E676" stroke-width="34" stroke-linecap="round" stroke-linejoin="round">
+    <g fill="none" stroke="#00E676" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"
+       transform="translate(228 228) scale(1.5) translate(-228 -228)">
         <path d="M160 136 V322" />
         <path d="M160 136 H220 A46 46 0 0 1 220 228 H160" />
         <path d="M212 228 C244 244 270 276 292 320" />

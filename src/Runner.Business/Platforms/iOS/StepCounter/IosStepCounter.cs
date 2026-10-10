@@ -83,7 +83,9 @@ public sealed class IosStepCounter(TimeProvider clock) : IStepCounter
             }
             int increment = steps - _lastSegmentSteps;
             double seconds = endTime - _lastSampleTime;
-            double actualCadence = cadence is >= 0 ? cadence.Value * 60
+            // 本次窗口没有新步数就是停下来了：原生步频会滞留（实测停走后还报 104 好几秒），不能采信。
+            double actualCadence = increment == 0 ? 0
+                : cadence is >= 0 ? cadence.Value * 60
                 : seconds > 0 ? increment / seconds * 60 : 0;
             string nativeCadence = cadence is double perSecond ? (perSecond * 60).ToString("F0") : "null";
             DiagnosticLog.Write("计步", $"steps={steps} 增量={increment} Δt={seconds:F1}s 原生步频={nativeCadence} 采用={actualCadence:F0} 距上次回调={clock.GetElapsedTime(_lastCadenceTimestamp).TotalSeconds:F1}s");
@@ -101,7 +103,8 @@ public sealed class IosStepCounter(TimeProvider clock) : IStepCounter
     {
         if (!_running || generation != _generation) return;
         double idle = clock.GetElapsedTime(_lastCadenceTimestamp).TotalSeconds;
-        if (idle < 3) return;
+        // 回调间隔实测 2.5 到 5 秒；窗口取 10 秒覆盖抖动，超过说明 CoreMotion 真的静默了。
+        if (idle < 10) return;
         if (!_cadenceExpired)
         {
             _cadenceExpired = true;

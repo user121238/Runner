@@ -2,7 +2,7 @@
 
 基于 **.NET 10 MAUI** 的离线跑步应用，把运动计时、课程节拍、GPS 轨迹、计步、配速和历史记录放在同一个会话里。
 
-当前代码标签：[0.0.1-alpha.1](https://github.com/user121238/Runner/tree/0.0.1-alpha.1)，处于预发布阶段。
+当前代码标签：[0.0.1-alpha.2](https://github.com/user121238/Runner/tree/0.0.1-alpha.2)，处于预发布阶段。
 
 [版本与下载](https://github.com/user121238/Runner/releases) · [GitHub Actions](https://github.com/user121238/Runner/actions/workflows/ios-unsigned.yml) · [iOS 发布指南](doc/IOS_RELEASE.md)
 
@@ -30,10 +30,11 @@
 | Android | Android 10 / API 29 | 优先使用硬件计步，缺少硬件来源时使用加速度兜底；GPS 与前台服务 |
 | iOS | iOS 15.0 | CoreLocation 定位、CMPedometer 系统计步、AVAudioPlayer 循环节拍 |
 
-- **音乐控制**：Android 可以向当前播放器发送系统媒体键，实际响应取决于播放器；iOS 使用系统播放控件，课程自动切歌和外部播放器控制入口隐藏。节拍器可与音乐混音。
+- **音乐控制**：Android 可以向当前播放器发送系统媒体键，实际响应取决于播放器；当前 Runner 尚未接入 iOS 播放器控制，仍可用耳机或控制中心切歌，相关应用内入口隐藏。节拍器可与音乐混音。
 - **权限**：首次开始运动或进入诊断页时按需申请，而不是打开首页时申请。相关权限未授予时，对应指标缺失或降级。
 - **数据**：课程和跑步记录保存在应用数据目录的 `runner.db`。沿用原 `WorkoutPlan`、`ActivityRecord` 集合和整数 ID，兼容旧记录。
 - **依赖**：使用公开 NuGet 源；不依赖开发者本机的私有包或手表原生库。
+- **iOS 运行时**：Release 也启用 Mono 解释器，让 LiteDB 的动态表达式与泛型方法正常执行；不改变已有数据库格式。此配置可能增加托管执行开销，性能仍需实测。
 
 ## 开发与构建
 
@@ -98,8 +99,8 @@ bash scripts/build-unsigned-ipa.sh 0.0.1-alpha 1 artifacts/ios
 
 ```bash
 git push origin master
-git tag -a 0.0.1-alpha.2 -m "Runner 0.0.1-alpha.2"
-git push origin 0.0.1-alpha.2
+git tag -a 0.0.1-alpha.3 -m "Runner 0.0.1-alpha.3"
+git push origin 0.0.1-alpha.3
 ```
 
 保留已发布标签的指向；新代码使用新标签，不覆盖已有的 `0.0.1-alpha`。
@@ -149,7 +150,7 @@ PYTHONUTF8=1 python3 -m unittest discover -s scripts/tests -v
 bash -n scripts/build-unsigned-ipa.sh
 ```
 
-截至 `0.0.1-alpha`，本地已通过 **234 项 .NET 回归测试、27 项发布脚本测试**，以及 Android Debug 完整构建、iOS Release 托管代码编译。托管编译与结构测试不等于 iOS AOT 打包或 iPhone 真机验收通过；云端构建状态以 [Actions](https://github.com/user121238/Runner/actions/workflows/ios-unsigned.yml) 为准。
+截至 `0.0.1-alpha.2`，本地已通过 **237 项 .NET 回归测试、38 项发布脚本与布局结构测试**，以及 Android Debug 完整构建、iOS Release 托管代码编译。托管编译与结构测试不等于 iPhone 真机验收通过；云端构建状态以 [Actions](https://github.com/user121238/Runner/actions/workflows/ios-unsigned.yml) 为准。
 
 ## 已知限制与验收范围
 
@@ -157,6 +158,7 @@ bash -n scripts/build-unsigned-ipa.sh
 - 实时配速使用时间窗，最快/最慢配速使用距离窗；短距离、低质量或稀疏定位可能缺少配速结果。
 - 后台运动受平台权限与系统策略约束。iOS 无定位且当前不播放节拍时，应用可能被挂起，阶段推进会延后。
 - iPhone 授权流程、长时间锁屏、来电后的音频恢复，以及室外已知路线和加速度兜底精度，仍需真机验收。
+- 遇到加载或保存异常时，可在提示区域点击“复制错误详情”保留完整堆栈；课程加载失败有重试入口，界面不会把失败当成空列表。
 
 ## 主要目录
 

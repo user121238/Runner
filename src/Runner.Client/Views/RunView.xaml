@@ -6,229 +6,244 @@
              x:DataType="vm:RunViewModel"
              BackgroundColor="{StaticResource Bg}">
 
-    <Grid Padding="20,10,20,14" RowDefinitions="Auto,*,Auto" RowSpacing="12">
+    <ContentView.Resources>
+        <Style x:Key="RunMetric" BasedOn="{StaticResource Metric}" TargetType="Label">
+            <Setter Property="LineBreakMode" Value="CharacterWrap" />
+        </Style>
+        <Style x:Key="RunHero" BasedOn="{StaticResource Hero}" TargetType="Label">
+            <Setter Property="LineBreakMode" Value="CharacterWrap" />
+        </Style>
+    </ContentView.Resources>
 
-        <!--  顶部：状态芯片（跑步中 / 已暂停 / 已结束）+ 课程轮次与阶段进度  -->
-        <VerticalStackLayout Grid.Row="0" Spacing="10">
-            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" MinimumHeightRequest="28">
-                <Border Padding="10,4"
-                        BackgroundColor="{StaticResource SurfaceAlt}"
-                        IsVisible="{Binding HasStatus}"
-                        StrokeShape="RoundRectangle 14"
-                        StrokeThickness="0"
-                        VerticalOptions="Center">
-                    <Border.Triggers>
-                        <DataTrigger Binding="{Binding IsRunning}" TargetType="Border" Value="True">
-                            <Setter Property="BackgroundColor" Value="{StaticResource AccentSoft}" />
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding IsPaused}" TargetType="Border" Value="True">
-                            <Setter Property="BackgroundColor" Value="{StaticResource WarnSoft}" />
-                        </DataTrigger>
-                    </Border.Triggers>
-                    <Label FontFamily="OpenSansSemibold"
-                           FontSize="12"
-                           Text="{Binding StatusText}"
-                           TextColor="{StaticResource TextSecondary}">
-                        <Label.Triggers>
-                            <DataTrigger Binding="{Binding IsRunning}" TargetType="Label" Value="True">
-                                <Setter Property="TextColor" Value="{StaticResource Accent}" />
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding IsPaused}" TargetType="Label" Value="True">
-                                <Setter Property="TextColor" Value="{StaticResource Warn}" />
-                            </DataTrigger>
-                        </Label.Triggers>
-                    </Label>
-                </Border>
-                <Label Grid.Column="1"
-                       HorizontalTextAlignment="End"
-                       LineBreakMode="TailTruncation"
-                       Style="{StaticResource Caption}"
-                       Text="{Binding WorkoutHeader}"
-                       VerticalTextAlignment="Center" />
-            </Grid>
+    <!-- 正文按内容自然排布；只有操作栏占固定的底部行，错误再长也不会挤走按钮。 -->
+    <Grid Padding="20,10,20,14" RowDefinitions="*,Auto" RowSpacing="12">
+        <ScrollView x:Name="RunBody" VerticalScrollBarVisibility="Default">
+            <VerticalStackLayout Padding="0,0,0,8" Spacing="20">
 
-            <VerticalStackLayout IsVisible="{Binding HasWorkout}" Spacing="8">
-                <ProgressBar HeightRequest="6" Progress="{Binding StageProgress}" ProgressColor="{StaticResource Accent}" />
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                    <Label LineBreakMode="TailTruncation"
+                <!-- 状态和课程进度也允许换行，不抢占正文的有限星号行。 -->
+                <VerticalStackLayout Spacing="10">
+                    <Border Padding="10,4"
+                            BackgroundColor="{StaticResource SurfaceAlt}"
+                            HorizontalOptions="Start"
+                            IsVisible="{Binding HasStatus}"
+                            StrokeShape="RoundRectangle 14"
+                            StrokeThickness="0">
+                        <Border.Triggers>
+                            <DataTrigger Binding="{Binding IsRunning}" TargetType="Border" Value="True">
+                                <Setter Property="BackgroundColor" Value="{StaticResource AccentSoft}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsPaused}" TargetType="Border" Value="True">
+                                <Setter Property="BackgroundColor" Value="{StaticResource WarnSoft}" />
+                            </DataTrigger>
+                        </Border.Triggers>
+                        <Label FontFamily="OpenSansSemibold"
+                               FontSize="12"
+                               LineBreakMode="WordWrap"
+                               Text="{Binding StatusText}"
+                               TextColor="{StaticResource TextSecondary}">
+                            <Label.Triggers>
+                                <DataTrigger Binding="{Binding IsRunning}" TargetType="Label" Value="True">
+                                    <Setter Property="TextColor" Value="{StaticResource Accent}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsPaused}" TargetType="Label" Value="True">
+                                    <Setter Property="TextColor" Value="{StaticResource Warn}" />
+                                </DataTrigger>
+                            </Label.Triggers>
+                        </Label>
+                    </Border>
+                    <Label LineBreakMode="WordWrap"
                            Style="{StaticResource Caption}"
-                           Text="{Binding NextStageText}"
-                           VerticalTextAlignment="Center" />
-                    <Label Grid.Column="1"
-                           FontFamily="OpenSansSemibold"
-                           FontSize="14"
-                           Text="{Binding RemainingText}"
-                           TextColor="{StaticResource Accent}" />
-                </Grid>
-            </VerticalStackLayout>
-        </VerticalStackLayout>
+                           Text="{Binding WorkoutHeader}" />
 
-        <!--  中部：空闲 = 顶部日期与上次跑步、底部选课程；跑动 / 结束 = 居中四个数字  -->
-        <Grid Grid.Row="1" RowDefinitions="Auto,*,Auto" RowSpacing="16">
-
-            <VerticalStackLayout Grid.Row="0" IsVisible="{Binding ShowIdleHeader}" Spacing="10">
-                <Label Style="{StaticResource SectionTitle}" Text="{Binding DateTitle}" />
-                <Border IsVisible="{Binding HasLastRun}" Style="{StaticResource Card}">
-                    <Border.GestureRecognizers>
-                        <TapGestureRecognizer Command="{Binding OpenLastRunCommand}" />
-                    </Border.GestureRecognizers>
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                        <VerticalStackLayout Spacing="4">
-                            <Label Style="{StaticResource Caption}" Text="上次跑步" />
-                            <Label Style="{StaticResource CardTitle}" Text="{Binding LastRunMetrics}" />
-                            <Label Style="{StaticResource CardDetail}" Text="{Binding LastRunMeta}" />
-                        </VerticalStackLayout>
-                        <Label Grid.Column="1"
-                               FontSize="22"
-                               Text="›"
-                               TextColor="{StaticResource TextTertiary}"
-                               VerticalOptions="Center" />
-                    </Grid>
-                </Border>
-                <Label IsVisible="{Binding ShowNoRunHint}" Style="{StaticResource Hint}" Text="还没有跑步记录。选个课程，或者直接自由跑。" />
-            </VerticalStackLayout>
-
-            <VerticalStackLayout Grid.Row="1"
-                                 IsVisible="{Binding HasSession}"
-                                 Spacing="24"
-                                 VerticalOptions="Center">
-                <VerticalStackLayout Spacing="0">
-                    <Label Style="{StaticResource Hero}" Text="{Binding Elapsed}" />
-                    <Label Style="{StaticResource MetricCaption}" Text="时长" />
-                </VerticalStackLayout>
-                <!--  跑动中：距离 / 实时配速，步频 / 目标步频  -->
-                <Grid ColumnDefinitions="*,*"
-                      IsVisible="{Binding IsActive}"
-                      RowDefinitions="Auto,Auto"
-                      RowSpacing="20">
-                    <VerticalStackLayout Spacing="2">
-                        <Label Style="{StaticResource Metric}" Text="{Binding DistanceKm, StringFormat='{}{0:F2}'}" />
-                        <Label Style="{StaticResource MetricCaption}" Text="公里" />
-                    </VerticalStackLayout>
-                    <VerticalStackLayout Grid.Column="1" Spacing="2">
-                        <Label Style="{StaticResource Metric}" Text="{Binding PaceText}" />
-                        <Label Style="{StaticResource MetricCaption}" Text="配速" />
-                    </VerticalStackLayout>
-                    <VerticalStackLayout Grid.Row="1" Spacing="2">
-                        <Label Style="{StaticResource Metric}" Text="{Binding CadenceText}" />
-                        <Label Style="{StaticResource MetricCaption}" Text="步频" />
-                    </VerticalStackLayout>
-                    <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2">
-                        <Label Style="{StaticResource Metric}" Text="{Binding TargetCadenceText}" TextColor="{StaticResource Accent}" />
-                        <Label Style="{StaticResource MetricCaption}" Text="目标步频" />
-                    </VerticalStackLayout>
-                </Grid>
-
-                <!--  结束后：成绩  -->
-                <Grid ColumnDefinitions="*,*,*"
-                      IsVisible="{Binding IsStopped}"
-                      RowDefinitions="Auto,Auto"
-                      RowSpacing="20">
-                    <VerticalStackLayout Spacing="2">
-                        <Label FontSize="30" Style="{StaticResource Metric}" Text="{Binding DistanceKm, StringFormat='{}{0:F2}'}" />
-                        <Label Style="{StaticResource MetricCaption}" Text="公里" />
-                    </VerticalStackLayout>
-                    <VerticalStackLayout Grid.Column="1" Spacing="2">
-                        <Label FontSize="30" Style="{StaticResource Metric}" Text="{Binding AveragePaceText}" TextColor="{StaticResource Accent}" />
-                        <Label Style="{StaticResource MetricCaption}" Text="平均配速" />
-                    </VerticalStackLayout>
-                    <VerticalStackLayout Grid.Column="2" Spacing="2">
-                        <Label FontSize="30" Style="{StaticResource Metric}" Text="{Binding AverageCadenceText}" />
-                        <Label Style="{StaticResource MetricCaption}" Text="均步频" />
-                    </VerticalStackLayout>
-                    <VerticalStackLayout Grid.Row="1" Spacing="2">
-                        <Label FontSize="30" Style="{StaticResource Metric}" Text="{Binding FastestPaceText}" />
-                        <Label Style="{StaticResource MetricCaption}" Text="最快配速" />
-                    </VerticalStackLayout>
-                    <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2">
-                        <Label FontSize="30" Style="{StaticResource Metric}" Text="{Binding SlowestPaceText}" />
-                        <Label Style="{StaticResource MetricCaption}" Text="最慢配速" />
-                    </VerticalStackLayout>
-                    <VerticalStackLayout Grid.Row="1" Grid.Column="2" Spacing="2">
-                        <Label FontSize="30" Style="{StaticResource Metric}" Text="{Binding StepCountText}" />
-                        <Label Style="{StaticResource MetricCaption}" Text="步数" />
-                    </VerticalStackLayout>
-                </Grid>
-            </VerticalStackLayout>
-
-            <VerticalStackLayout Grid.Row="2" IsVisible="{Binding IsIdle}" Spacing="12">
-                <Label Style="{StaticResource SectionTitle}" Text="选择课程" />
-                <CollectionView HeightRequest="40"
-                                HorizontalScrollBarVisibility="Never"
-                                ItemsSource="{Binding Choices}"
-                                SelectionMode="None">
-                    <CollectionView.ItemsLayout>
-                        <LinearItemsLayout ItemSpacing="8" Orientation="Horizontal" />
-                    </CollectionView.ItemsLayout>
-                    <CollectionView.ItemTemplate>
-                        <DataTemplate x:DataType="vm:WorkoutChoice">
-                            <Border Style="{StaticResource Chip}">
-                                <Border.Triggers>
-                                    <DataTrigger Binding="{Binding IsSelected}" TargetType="Border" Value="True">
-                                        <Setter Property="BackgroundColor" Value="{StaticResource AccentSoft}" />
-                                        <Setter Property="Stroke" Value="{StaticResource Accent}" />
-                                    </DataTrigger>
-                                </Border.Triggers>
-                                <Border.GestureRecognizers>
-                                    <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RunViewModel}}, Path=SelectCommand}" CommandParameter="{Binding .}" />
-                                </Border.GestureRecognizers>
-                                <Label FontSize="14"
-                                       Text="{Binding Name}"
-                                       TextColor="{StaticResource TextSecondary}"
-                                       VerticalTextAlignment="Center">
-                                    <Label.Triggers>
-                                        <DataTrigger Binding="{Binding IsSelected}" TargetType="Label" Value="True">
-                                            <Setter Property="TextColor" Value="{StaticResource Accent}" />
-                                        </DataTrigger>
-                                    </Label.Triggers>
-                                </Label>
-                            </Border>
-                        </DataTemplate>
-                    </CollectionView.ItemTemplate>
-                </CollectionView>
-
-                <!--  固定高度、三行恒定：切换课程时卡片不变高，页面不重排，顶部的卡不抖  -->
-                <Border HeightRequest="128" Style="{StaticResource Card}">
-                    <VerticalStackLayout Spacing="6">
-                        <Label LineBreakMode="TailTruncation" Style="{StaticResource CardTitle}" Text="{Binding SummaryTitle}" />
-                        <Label LineBreakMode="TailTruncation" Style="{StaticResource CardDetail}" Text="{Binding SummaryDetail}" />
-                        <Label Margin="0,6,0,0"
+                    <VerticalStackLayout IsVisible="{Binding HasWorkout}" Spacing="8">
+                        <ProgressBar HeightRequest="6" Progress="{Binding StageProgress}" ProgressColor="{StaticResource Accent}" />
+                        <Label LineBreakMode="WordWrap" Style="{StaticResource Caption}" Text="{Binding NextStageText}" />
+                        <Label FontFamily="OpenSansSemibold"
                                FontSize="14"
-                               LineBreakMode="TailTruncation"
-                               LineHeight="1.35"
-                               MaxLines="2"
-                               Style="{StaticResource Body}"
-                               Text="{Binding SummaryStages}" />
+                               HorizontalTextAlignment="End"
+                               LineBreakMode="WordWrap"
+                               Text="{Binding RemainingText}"
+                               TextColor="{StaticResource Accent}" />
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+
+                <!-- 保留完整提示；详情可复制，正文仍按全文高度测量并滚动。 -->
+                <Border x:Name="RunMessage" IsVisible="{Binding HasMessage}" Style="{StaticResource Card}">
+                    <VerticalStackLayout Spacing="10">
+                        <Label LineBreakMode="CharacterWrap"
+                               Style="{StaticResource Caption}"
+                               Text="{Binding Message}"
+                               TextColor="{StaticResource Warn}" />
+                        <Button Command="{Binding CopyErrorDetailsCommand}"
+                                HorizontalOptions="Start"
+                                IsVisible="{Binding HasErrorDetails}"
+                                Style="{StaticResource GhostButton}"
+                                Text="{Binding CopyErrorText}" />
                     </VerticalStackLayout>
                 </Border>
+
+                <VerticalStackLayout IsVisible="{Binding ShowIdleHeader}" Spacing="10">
+                    <Label Style="{StaticResource SectionTitle}" Text="{Binding DateTitle}" />
+                    <Border IsVisible="{Binding HasLastRun}" Style="{StaticResource Card}">
+                        <Border.GestureRecognizers>
+                            <TapGestureRecognizer Command="{Binding OpenLastRunCommand}" />
+                        </Border.GestureRecognizers>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Style="{StaticResource Caption}" Text="上次跑步" />
+                                <Label LineBreakMode="WordWrap" Style="{StaticResource CardTitle}" Text="{Binding LastRunMetrics}" />
+                                <Label LineBreakMode="WordWrap" Style="{StaticResource CardDetail}" Text="{Binding LastRunMeta}" />
+                            </VerticalStackLayout>
+                            <Label Grid.Column="1"
+                                   FontSize="22"
+                                   Text="›"
+                                   TextColor="{StaticResource TextTertiary}"
+                                   VerticalOptions="Center" />
+                        </Grid>
+                    </Border>
+                    <Label IsVisible="{Binding ShowNoRunHint}"
+                           LineBreakMode="WordWrap"
+                           Style="{StaticResource Hint}"
+                           Text="还没有跑步记录。选个课程，或者直接自由跑。" />
+                </VerticalStackLayout>
+
+                <VerticalStackLayout x:Name="SessionMetrics" IsVisible="{Binding HasSession}" Spacing="24">
+                    <VerticalStackLayout Spacing="0">
+                        <Label Style="{StaticResource RunHero}" Text="{Binding Elapsed}" />
+                        <Label Style="{StaticResource MetricCaption}" Text="时长" />
+                    </VerticalStackLayout>
+
+                    <!-- 跑动中：距离 / 实时配速，步频 / 目标步频。行高由实际字号决定。 -->
+                    <Grid ColumnDefinitions="*,*"
+                          ColumnSpacing="12"
+                          IsVisible="{Binding IsActive}"
+                          RowDefinitions="Auto,Auto"
+                          RowSpacing="20">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Style="{StaticResource RunMetric}" Text="{Binding DistanceKm, StringFormat='{}{0:F2}'}" />
+                            <Label Style="{StaticResource MetricCaption}" Text="公里" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Style="{StaticResource RunMetric}" Text="{Binding PaceText}" />
+                            <Label Style="{StaticResource MetricCaption}" Text="配速" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="1" Spacing="2">
+                            <Label Style="{StaticResource RunMetric}" Text="{Binding CadenceText}" />
+                            <Label Style="{StaticResource MetricCaption}" Text="步频" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2">
+                            <Label Style="{StaticResource RunMetric}" Text="{Binding TargetCadenceText}" TextColor="{StaticResource Accent}" />
+                            <Label Style="{StaticResource MetricCaption}" Text="目标步频" />
+                        </VerticalStackLayout>
+                    </Grid>
+
+                    <!-- 结束后：成绩完整地排在选课之前；窄屏和大字号只增加行高。 -->
+                    <Grid ColumnDefinitions="*,*,*"
+                          ColumnSpacing="10"
+                          IsVisible="{Binding IsStopped}"
+                          RowDefinitions="Auto,Auto"
+                          RowSpacing="20">
+                        <VerticalStackLayout Spacing="2">
+                            <Label FontSize="30" Style="{StaticResource RunMetric}" Text="{Binding DistanceKm, StringFormat='{}{0:F2}'}" />
+                            <Label Style="{StaticResource MetricCaption}" Text="公里" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label FontSize="30" Style="{StaticResource RunMetric}" Text="{Binding AveragePaceText}" TextColor="{StaticResource Accent}" />
+                            <Label Style="{StaticResource MetricCaption}" Text="平均配速" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="2" Spacing="2">
+                            <Label FontSize="30" Style="{StaticResource RunMetric}" Text="{Binding AverageCadenceText}" />
+                            <Label Style="{StaticResource MetricCaption}" Text="均步频" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="1" Spacing="2">
+                            <Label FontSize="30" Style="{StaticResource RunMetric}" Text="{Binding FastestPaceText}" />
+                            <Label Style="{StaticResource MetricCaption}" Text="最快配速" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2">
+                            <Label FontSize="30" Style="{StaticResource RunMetric}" Text="{Binding SlowestPaceText}" />
+                            <Label Style="{StaticResource MetricCaption}" Text="最慢配速" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Row="1" Grid.Column="2" Spacing="2">
+                            <Label FontSize="30" Style="{StaticResource RunMetric}" Text="{Binding StepCountText}" />
+                            <Label Style="{StaticResource MetricCaption}" Text="步数" />
+                        </VerticalStackLayout>
+                    </Grid>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout x:Name="WorkoutSelection" IsVisible="{Binding IsIdle}" Spacing="12">
+                    <Label Style="{StaticResource SectionTitle}" Text="选择课程" />
+                    <!-- 少量课程芯片自然换行，不在纵向正文里嵌套固定高度的列表。 -->
+                    <FlexLayout BindableLayout.ItemsSource="{Binding Choices}" Direction="Row" Wrap="Wrap">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="vm:WorkoutChoice">
+                                <Border Margin="0,0,8,8"
+                                        Padding="16,10"
+                                        FlexLayout.Shrink="1"
+                                        HeightRequest="-1"
+                                        MinimumHeightRequest="40"
+                                        Style="{StaticResource Chip}">
+                                    <Border.Triggers>
+                                        <DataTrigger Binding="{Binding IsSelected}" TargetType="Border" Value="True">
+                                            <Setter Property="BackgroundColor" Value="{StaticResource AccentSoft}" />
+                                            <Setter Property="Stroke" Value="{StaticResource Accent}" />
+                                        </DataTrigger>
+                                    </Border.Triggers>
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Command="{Binding Source={RelativeSource AncestorType={x:Type vm:RunViewModel}}, Path=SelectCommand}" CommandParameter="{Binding .}" />
+                                    </Border.GestureRecognizers>
+                                    <Label FontSize="14"
+                                           LineBreakMode="WordWrap"
+                                           Text="{Binding Name}"
+                                           TextColor="{StaticResource TextSecondary}">
+                                        <Label.Triggers>
+                                            <DataTrigger Binding="{Binding IsSelected}" TargetType="Label" Value="True">
+                                                <Setter Property="TextColor" Value="{StaticResource Accent}" />
+                                            </DataTrigger>
+                                        </Label.Triggers>
+                                    </Label>
+                                </Border>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </FlexLayout>
+
+                    <Border x:Name="WorkoutSummary" Style="{StaticResource Card}">
+                        <VerticalStackLayout Spacing="6">
+                            <Label LineBreakMode="WordWrap" Style="{StaticResource CardTitle}" Text="{Binding SummaryTitle}" />
+                            <Label LineBreakMode="WordWrap" Style="{StaticResource CardDetail}" Text="{Binding SummaryDetail}" />
+                            <Label Margin="0,6,0,0"
+                                   FontSize="14"
+                                   LineBreakMode="WordWrap"
+                                   LineHeight="1.35"
+                                   Style="{StaticResource Body}"
+                                   Text="{Binding SummaryStages}" />
+                        </VerticalStackLayout>
+                    </Border>
+                </VerticalStackLayout>
             </VerticalStackLayout>
+        </ScrollView>
 
+        <Grid x:Name="RunActions" Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <Button Command="{Binding PrimaryCommand}"
+                    HeightRequest="-1"
+                    MinimumHeightRequest="60"
+                    Style="{StaticResource PrimaryButton}"
+                    Text="{Binding PrimaryText}">
+                <Button.Triggers>
+                    <DataTrigger Binding="{Binding IsRunning}" TargetType="Button" Value="True">
+                        <Setter Property="BackgroundColor" Value="{StaticResource SurfaceAlt}" />
+                        <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
+                    </DataTrigger>
+                </Button.Triggers>
+            </Button>
+            <Button Grid.Column="1"
+                    Command="{Binding StopCommand}"
+                    HeightRequest="-1"
+                    IsVisible="{Binding CanStop}"
+                    MinimumHeightRequest="60"
+                    MinimumWidthRequest="112"
+                    Style="{StaticResource DangerOutlineButton}"
+                    Text="结束" />
         </Grid>
-
-        <!--  底部：提示 + 主按钮（开始 / 暂停 / 继续）+ 结束  -->
-        <VerticalStackLayout Grid.Row="2" Spacing="10">
-            <Label HorizontalTextAlignment="Center"
-                   IsVisible="{Binding HasMessage}"
-                   Style="{StaticResource Caption}"
-                   Text="{Binding Message}"
-                   TextColor="{StaticResource Warn}" />
-            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                <Button Command="{Binding PrimaryCommand}" Style="{StaticResource PrimaryButton}" Text="{Binding PrimaryText}">
-                    <Button.Triggers>
-                        <DataTrigger Binding="{Binding IsRunning}" TargetType="Button" Value="True">
-                            <Setter Property="BackgroundColor" Value="{StaticResource SurfaceAlt}" />
-                            <Setter Property="TextColor" Value="{StaticResource TextPrimary}" />
-                        </DataTrigger>
-                    </Button.Triggers>
-                </Button>
-                <Button Grid.Column="1"
-                        Command="{Binding StopCommand}"
-                        IsVisible="{Binding CanStop}"
-                        Style="{StaticResource DangerOutlineButton}"
-                        Text="结束"
-                        WidthRequest="112" />
-            </Grid>
-        </VerticalStackLayout>
     </Grid>
 
 </ContentView>

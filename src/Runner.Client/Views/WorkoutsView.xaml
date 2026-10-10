@@ -6,26 +6,60 @@
              x:DataType="vm:WorkoutsViewModel"
              BackgroundColor="{StaticResource Bg}">
 
-    <Grid Padding="20,10,20,14" RowDefinitions="Auto,*,Auto" RowSpacing="14">
-        <Label Style="{StaticResource PageTitle}" Text="课程" />
-
-        <CollectionView Grid.Row="1"
+    <Grid Padding="20,10,20,14" RowDefinitions="*,Auto" RowSpacing="14">
+        <!-- Header 与列表一起滚动，错误全文不挤占底部新建按钮。 -->
+        <CollectionView x:Name="WorkoutList"
                         ItemsSource="{Binding Items}"
                         SelectionMode="None"
-                        VerticalScrollBarVisibility="Never">
-            <CollectionView.EmptyView>
-                <VerticalStackLayout HorizontalOptions="Center" Spacing="10" VerticalOptions="Center">
-                    <Image HeightRequest="48"
-                           HorizontalOptions="Center"
-                           Opacity="0.7"
-                           Source="icon_course.png"
-                           WidthRequest="48" />
-                    <Label HorizontalTextAlignment="Center" Style="{StaticResource CardTitle}" Text="还没有课程" />
-                    <Label HorizontalTextAlignment="Center"
-                           Style="{StaticResource Hint}"
-                           Text="按阶段设定步频与时长或距离，到节点自动切歌。&#10;比如：180 步频 2 分钟 → 120 步频 1 分钟，重复 4 轮。" />
-                </VerticalStackLayout>
-            </CollectionView.EmptyView>
+                        VerticalScrollBarVisibility="Default">
+            <CollectionView.Header>
+                <ContentView>
+                    <VerticalStackLayout Padding="0,0,0,14" Spacing="14">
+                        <Label Style="{StaticResource PageTitle}" Text="课程" />
+
+                        <VerticalStackLayout IsVisible="{Binding IsLoading}" Spacing="8">
+                            <ActivityIndicator Color="{StaticResource Accent}" IsRunning="{Binding IsLoading}" />
+                            <Label HorizontalTextAlignment="Center" Style="{StaticResource Caption}" Text="正在加载课程…" />
+                        </VerticalStackLayout>
+
+                        <Border x:Name="WorkoutError" IsVisible="{Binding HasMessage}" Style="{StaticResource Card}">
+                            <VerticalStackLayout Spacing="10">
+                                <Label LineBreakMode="CharacterWrap"
+                                       Style="{StaticResource Caption}"
+                                       Text="{Binding Message}"
+                                       TextColor="{StaticResource Warn}" />
+                                <Button Command="{Binding RetryCommand}"
+                                        HeightRequest="-1"
+                                        MinimumHeightRequest="48"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Text="重新加载课程" />
+                                <Button Command="{Binding CopyErrorDetailsCommand}"
+                                        HorizontalOptions="Start"
+                                        IsVisible="{Binding HasErrorDetails}"
+                                        Style="{StaticResource GhostButton}"
+                                        Text="{Binding CopyErrorText}" />
+                            </VerticalStackLayout>
+                        </Border>
+
+                        <!-- 只有成功读取空列表才显示；数据库失败不是“还没有课程”。 -->
+                        <VerticalStackLayout x:Name="WorkoutEmpty" Padding="0,24" IsVisible="{Binding ShowEmpty}" Spacing="10">
+                            <Image HeightRequest="48"
+                                   HorizontalOptions="Center"
+                                   Opacity="0.7"
+                                   Source="icon_course.png"
+                                   WidthRequest="48" />
+                            <Label HorizontalTextAlignment="Center"
+                                   LineBreakMode="WordWrap"
+                                   Style="{StaticResource CardTitle}"
+                                   Text="还没有课程" />
+                            <Label HorizontalTextAlignment="Center"
+                                   LineBreakMode="WordWrap"
+                                   Style="{StaticResource Hint}"
+                                   Text="按阶段设定步频与时长或距离，到节点自动切换目标步频。&#10;比如：180 步频 2 分钟 → 120 步频 1 分钟，重复 4 轮。" />
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </ContentView>
+            </CollectionView.Header>
             <CollectionView.ItemTemplate>
                 <DataTemplate x:DataType="vm:WorkoutListItem">
                     <Border Margin="0,0,0,10" Style="{StaticResource Card}">
@@ -36,7 +70,7 @@
                               ColumnSpacing="12"
                               RowDefinitions="Auto,Auto,Auto"
                               RowSpacing="4">
-                            <Label Style="{StaticResource CardTitle}" Text="{Binding Name}" />
+                            <Label LineBreakMode="WordWrap" Style="{StaticResource CardTitle}" Text="{Binding Name}" />
                             <Label Grid.Column="1"
                                    FontSize="22"
                                    Text="›"
@@ -44,6 +78,7 @@
                                    VerticalOptions="Start" />
                             <Label Grid.Row="1"
                                    Grid.ColumnSpan="2"
+                                   LineBreakMode="WordWrap"
                                    Style="{StaticResource CardDetail}"
                                    Text="{Binding Summary}" />
                             <Grid Grid.Row="2"
@@ -69,14 +104,13 @@
             </CollectionView.ItemTemplate>
         </CollectionView>
 
-        <VerticalStackLayout Grid.Row="2" Spacing="8">
-            <Label HorizontalTextAlignment="Center"
-                   IsVisible="{Binding HasMessage}"
-                   Style="{StaticResource Caption}"
-                   Text="{Binding Message}"
-                   TextColor="{StaticResource Warn}" />
-            <Button Command="{Binding CreateCommand}" Style="{StaticResource PrimaryButton}" Text="新建课程" />
-        </VerticalStackLayout>
+        <Button x:Name="CreateWorkout"
+                Grid.Row="1"
+                Command="{Binding CreateCommand}"
+                HeightRequest="-1"
+                MinimumHeightRequest="60"
+                Style="{StaticResource PrimaryButton}"
+                Text="新建课程" />
     </Grid>
 
 </ContentView>

@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.Globalization;
+using Microsoft.Maui.ApplicationModel.DataTransfer;
 using Prism.Commands;
 using Prism.Mvvm;
 using Prism.Navigation;
@@ -43,9 +44,11 @@ public class RunViewModel : BindableBase, IRegionAware
     private bool _isActive;
     private bool _isStopped;
     private string _summaryTitle = FreeRunName;
-    private string _summaryDetail = "";
-    private string _summaryStages = "";
+    private string _summaryDetail = "不播节拍，按自己的节奏跑";
+    private string _summaryStages = "记录时长、距离与步频";
     private string _message = "";
+    private string _errorDetails = "";
+    private string _copyErrorText = "复制错误详情";
     private string _primaryText = "开始";
     private bool _canStop;
     private bool _hasSession;
@@ -56,6 +59,7 @@ public class RunViewModel : BindableBase, IRegionAware
     private bool _showIdleHeader = true;
     private bool _showNoRunHint;
     private bool _hasLastRun;
+    private bool _hasLoadedLastRun;
     private string _dateTitle = "";
     private string _lastRunMetrics = "";
     private string _lastRunMeta = "";
@@ -71,9 +75,10 @@ public class RunViewModel : BindableBase, IRegionAware
         OpenLastRunCommand = new AsyncDelegateCommand(
             () => _navigation.NavigateAsync("ActivityDetailPage", ("id", _lastRunId)),
             () => HasLastRun);
+        CopyErrorDetailsCommand = new AsyncDelegateCommand(CopyErrorDetailsAsync, () => HasErrorDetails);
         _host.Updated += OnHostUpdated;
-        _host.Error += OnHostMessage;
-        _host.Notice += OnHostMessage;
+        _host.Error += OnHostError;
+        _host.Notice += OnHostNotice;
         _host.Workouts.Changed += OnWorkoutsChanged;
         _host.Activities.Changed += OnActivitiesChanged;
         _ = LoadChoicesAsync();
@@ -84,6 +89,7 @@ public class RunViewModel : BindableBase, IRegionAware
     public AsyncDelegateCommand StopCommand { get; }
     public DelegateCommand<WorkoutChoice> SelectCommand { get; }
     public AsyncDelegateCommand OpenLastRunCommand { get; }
+    public AsyncDelegateCommand CopyErrorDetailsCommand { get; }
 
     /// <summary>第 0 项固定为自由跑，之后是课程。</summary>
     public ObservableCollection<WorkoutChoice> Choices { get; } = new();
@@ -152,6 +158,20 @@ public class RunViewModel : BindableBase, IRegionAware
     }
 
     public bool HasMessage => _message.Length > 0;
+    public string ErrorDetails
+    {
+        get => _errorDetails;
+        private set
+        {
+            if (!SetProperty(ref _errorDetails, value)) return;
+            RaisePropertyChanged(nameof(HasErrorDetails));
+            CopyErrorText = "复制错误详情";
+            CopyErrorDetailsCommand.RaiseCanExecuteChanged();
+        }
+    }
+
+    public bool HasErrorDetails => _errorDetails.Length > 0;
+    public string CopyErrorText { get => _copyErrorText; private set => SetProperty(ref _copyErrorText, value); }
     public string PrimaryText { get => _primaryText; private set => SetProperty(ref _primaryText, value); }
     public bool CanStop { get => _canStop; private set => SetProperty(ref _canStop, value); }
 
@@ -167,6 +187,7 @@ public class RunViewModel : BindableBase, IRegionAware
 
     private async Task LoadLastRunAsync()
     {
+        _hasLoadedLastRun = false;
         try
         {
             var records = await _host.Activities.GetAllAsync();
@@ -179,10 +200,11 @@ public class RunViewModel : BindableBase, IRegionAware
                 LastRunMetrics = $"{last.DistanceMeters / 1000:F2} 公里 · {ActivityListItem.FormatDuration(last.ElapsedSeconds)} · 配速 {PaceFormat.Text(PaceCalculator.Average(TimeSpan.FromSeconds(last.ElapsedSeconds), last.DistanceMeters))}";
                 LastRunMeta = $"{last.StartTimeUtc.ToLocalTime():M月d日 HH:mm} · {workout}";
             }
+            _hasLoadedLastRun = true;
         }
         catch (Exception ex)
         {
-            Message = $"记录加载失败: {ex.Message}";
+            SetError($"记录加载失败: {ex.Message}", ex);
         }
         OpenLastRunCommand.RaiseCanExecuteChanged();
         Refresh();
@@ -204,7 +226,7 @@ public class RunViewModel : BindableBase, IRegionAware
         }
         catch (Exception ex)
         {
-            Message = $"课程加载失败: {ex.Message}";
+            SetError($"课程加载失败: {ex.Message}", ex);
             Refresh();
         }
     }
@@ -216,7 +238,7 @@ public class RunViewModel : BindableBase, IRegionAware
         _host.SelectedWorkout = choice.Plan;
         _host.PreferredWorkoutId = choice.Plan?.Id ?? 0;
 
-        // 摘要卡三行恒定（自由跑也有第三行）：切换时卡片高度不变，页面不重排
+        // 文案按实际内容自然换行，卡片高度由可滚动正文计算。
         var plan = choice.Plan;
         SummaryTitle = choice.Name;
         SummaryDetail = plan == null ? "不播节拍，按自己的节奏跑" : WorkoutListItem.Describe(plan);
@@ -227,6 +249,7 @@ public class RunViewModel : BindableBase, IRegionAware
     private async Task PrimaryAsync()
     {
         Message = "";
+        ErrorDetails = "";
         try
         {
             // 权限与来源在首次点击开始时申请、创建：它们是运动的前提，不是页面的前提
@@ -248,7 +271,7 @@ public class RunViewModel : BindableBase, IRegionAware
         }
         catch (Exception ex)
         {
-            Message = ex.Message;
+            SetError(ex.Message, ex);
         }
         Refresh();
     }
@@ -266,14 +289,48 @@ public class RunViewModel : BindableBase, IRegionAware
         }
         catch (Exception ex)
         {
-            Message = ex.Message;
+            SetError(ex.Message, ex);
         }
         Refresh();
     }
 
     private void OnHostUpdated() => MainThread.BeginInvokeOnMainThread(Refresh);
 
-    private void OnHostMessage(string message) => MainThread.BeginInvokeOnMainThread(() => Message = message);
+    private void OnHostError(string message)
+    {
+        // 先捕获本次详情，避免切回主线程前被下一条错误覆盖。
+        string details = _host.LastErrorDetails;
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            Message = message;
+            ErrorDetails = string.IsNullOrEmpty(details) ? message : details;
+        });
+    }
+
+    private void OnHostNotice(string message) => MainThread.BeginInvokeOnMainThread(() =>
+    {
+        Message = message;
+        ErrorDetails = "";
+    });
+
+    private void SetError(string message, Exception exception)
+    {
+        Message = message;
+        ErrorDetails = exception.ToString();
+    }
+
+    private async Task CopyErrorDetailsAsync()
+    {
+        try
+        {
+            await Clipboard.Default.SetTextAsync(ErrorDetails);
+            CopyErrorText = "已复制错误详情";
+        }
+        catch
+        {
+            CopyErrorText = "复制失败，点击重试";
+        }
+    }
 
     private void Refresh()
     {
@@ -288,7 +345,7 @@ public class RunViewModel : BindableBase, IRegionAware
         IsActive = active;
         IsStopped = state == RunSessionState.Stopped;
         ShowIdleHeader = !active && session == null;
-        ShowNoRunHint = ShowIdleHeader && !HasLastRun;
+        ShowNoRunHint = ShowIdleHeader && _hasLoadedLastRun && !HasLastRun;
         DateTitle = DateTime.Now.ToString("M月d日 dddd", ChineseCulture);
         IsRunning = state == RunSessionState.Running;
         IsPaused = state == RunSessionState.Paused;

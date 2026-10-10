@@ -16,7 +16,7 @@ public sealed class IosRunPlatform : IRunPlatform
     public TimeProvider Clock { get; } = new SensorClock(IosMonotonicClock.GetNanoseconds);
     public bool CanSwitchStepCounter => false;
     public bool CanControlMusic => false;
-    public string MusicControlStatus => "iOS 不支持控制其他音乐应用；请使用系统播放控件。节拍器可与音乐混音。";
+    public string MusicControlStatus => "Runner 当前未接入播放器控制；可用耳机或 iOS 控制中心切歌，节拍器可与音乐混音。";
 
     public ICadencePlayer CreateCadencePlayer() => new IosCadencePlayer("beep3.wav");
 

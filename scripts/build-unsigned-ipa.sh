@@ -46,6 +46,18 @@ dotnet --info >"${output}/logs/dotnet-info.txt"
 dotnet workload list >"${output}/logs/workloads.txt"
 xcodebuild -version >"${output}/logs/xcode.txt"
 
+# Release defaults differ from Debug: validate the SDK's effective device runtime
+# before publishing, and keep the evidence with the build diagnostics.
+dotnet msbuild "${root}/src/Runner.Client/Runner.Client.csproj" -nologo \
+    -p:RunnerTargetFrameworks=net10.0-ios \
+    -p:TargetFramework=net10.0-ios \
+    -p:Configuration=Release \
+    -p:RuntimeIdentifier=ios-arm64 \
+    '-getProperty:Configuration,TargetFramework,RuntimeIdentifier,UseInterpreter,MtouchInterpreter,UseMonoRuntime,PublishAot,DynamicCodeSupport' \
+    "-bl:${output}/logs/runtime-properties-{}.binlog" \
+    >"${output}/logs/runtime-properties.json"
+python3 "$helper" verify-runtime "${output}/logs/runtime-properties.json"
+
 dotnet publish "${root}/src/Runner.Client/Runner.Client.csproj" \
     --configuration Release \
     --framework net10.0-ios \

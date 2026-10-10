@@ -57,6 +57,8 @@ public sealed class RunSessionHost : IDisposable
     public bool CanSwitchStepCounter => _platform.CanSwitchStepCounter;
     public bool CanControlMusic => _platform.CanControlMusic;
     public string MusicControlStatus => _platform.MusicControlStatus;
+    /// <summary>最近一次 Error 的完整异常，供界面按需复制；不写入运动记录。</summary>
+    public string LastErrorDetails { get; private set; } = "";
 
     public void NextTrack() => _platform.NextTrack();
     public void PreviousTrack() => _platform.PreviousTrack();
@@ -100,7 +102,7 @@ public sealed class RunSessionHost : IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "加载节拍音失败");
-            Error?.Invoke($"加载节拍音失败: {ex.Message}");
+            ReportError($"加载节拍音失败: {ex.Message}", ex);
         }
     }
 
@@ -163,6 +165,12 @@ public sealed class RunSessionHost : IDisposable
     private void OnControllerError(string message)
     {
         _logger.LogWarning("运动会话: {Message}", message);
+        ReportError(message);
+    }
+
+    private void ReportError(string message, Exception? exception = null)
+    {
+        LastErrorDetails = exception?.ToString() ?? message;
         Error?.Invoke(message);
     }
 
@@ -177,12 +185,13 @@ public sealed class RunSessionHost : IDisposable
         try
         {
             await Activities.SaveAsync(record);
+            LastErrorDetails = "";
             Notice?.Invoke("记录已保存");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "保存记录失败");
-            Error?.Invoke($"保存记录失败: {ex.Message}");
+            ReportError($"保存记录失败: {ex.Message}", ex);
         }
     }
 

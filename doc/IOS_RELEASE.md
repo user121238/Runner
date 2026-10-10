@@ -69,6 +69,18 @@ GitHub 的 runner 标签会更新，整个系统镜像不是固定快照。将�
 
 只发布 Client 的 `net10.0-ios` / `ios-arm64` / `Release`，通过 `-p:RunnerTargetFrameworks=net10.0-ios` 让项目引用也只解析 iOS。Core 保持纯 `net10.0`。
 
+### iOS Mono 解释器与 LiteDB
+
+Client 项目仅对 iOS 设置 `MtouchInterpreter=all`，同时覆盖 Debug 与 **Release 真机发布**。LiteDB 的表达式映射会运行时创建动态方法和泛型 thunk；只有 Mono AOT 而没有解释器时，保存活动等路径可能报 `Attempting to JIT compile ... while running in aot-only mode`。只解释 `LiteDB` 一个程序集会遗漏框架或调用方产生的 thunk，因此当前使用所有程序集解释，不维护猜测的程序集名单。
+
+这是 .NET 10 **Mono** 配置，不是 NativeAOT：不启用 `PublishAot` 或 `IsAotCompatible`，不屏蔽 IL 告警，不改数据库格式，也不改变 Android 构建。代价是部分托管代码的执行性能可能低于完整 AOT；原生定位、计步与音频仍由系统 API 执行，性能优化另行测量。
+
+发布脚本在实际 `Release` / `ios-arm64` 参数下调用 SDK 的 `-getProperty`，检查 `UseMonoRuntime=true`、`MtouchInterpreter=all`、未启用 NativeAOT、未禁用动态代码支持；结果保存到 `logs/runtime-properties.json`。配置退回默认 AOT-only 或变成局部解释器时直接终止发布，而不是生成已知会在动态映射路径失败的包。
+
+依据：[Microsoft 的 MtouchInterpreter 文档](https://learn.microsoft.com/en-us/dotnet/ios/building-apps/build-properties#mtouchinterpreter)说明 `all` 解释所有程序集，与 `UseInterpreter=true` 等价；.NET 10 MAUI 默认只在 iOS Debug 启用解释器，Release 需要明确配置。现有安装包不会因仓库配置变化而改变，须重新构建、重新签名并在 iPhone 上复测课程加载、保存和重启后读取；桌面单测和属性检查不替代该真机验证。
+
+### 无签名设备包
+
 明确关闭 `EnableCodeSigning`、`CodesignRequireProvisioningProfile`、`ArchiveOnBuild` 和 `BuildIpa`。不导入证书、描述文件或签名 secrets，不调用 Xcode 的签名归档/导出流程。先生成真实 `.app`，再在临时副本上清理可能随原生依赖带入的签名与 profile，并逐个使用 `codesign` 确认 Mach-O 未签名。
 
 Python 打包器还会检查：

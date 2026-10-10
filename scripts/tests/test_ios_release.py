@@ -10,6 +10,7 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+import xml.etree.ElementTree as ET
 import zipfile
 
 
@@ -88,6 +89,56 @@ class VersionTests(unittest.TestCase):
                                      "--build-number", "42", "--github-output", str(output)], capture_output=True, text=True)
             self.assertEqual(1, result.returncode)
             self.assertFalse(output.exists())
+
+
+class RuntimeConfigurationTests(unittest.TestCase):
+    @staticmethod
+    def properties(**changes):
+        return {"Properties": {
+            "Configuration": "Release", "TargetFramework": "net10.0-ios", "RuntimeIdentifier": "ios-arm64",
+            "UseMonoRuntime": "true", "MtouchInterpreter": "all", "PublishAot": "", "DynamicCodeSupport": "",
+            **changes,
+        }}
+
+    def test_release_device_with_all_assemblies_interpreted_is_accepted(self):
+        self.assertIsNone(release.verify_runtime_properties(self.properties()))
+        self.assertIsNone(release.verify_runtime_properties(self.properties(PublishAot="false", DynamicCodeSupport="true")))
+
+    def test_debug_simulator_android_and_partial_interpreter_configs_are_rejected(self):
+        for changes in ({"Configuration": "Debug"}, {"TargetFramework": "net10.0-android"},
+                        {"RuntimeIdentifier": "iossimulator-arm64"}, {"MtouchInterpreter": ""},
+                        {"MtouchInterpreter": "LiteDB"}, {"MtouchInterpreter": "all,-System.Linq.Expressions"},
+                        {"UseMonoRuntime": "false"}, {"PublishAot": "true"}, {"DynamicCodeSupport": "false"}):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                release.verify_runtime_properties(self.properties(**changes))
+
+    def test_missing_evaluated_properties_are_rejected(self):
+        for document in ({}, {"Properties": {}}, {"Properties": "all"}, []):
+            with self.subTest(document=document), self.assertRaises(ValueError):
+                release.verify_runtime_properties(document)
+
+    def test_client_interpreter_setting_is_ios_only_and_not_debug_only(self):
+        project = ET.parse(HELPER.parents[1] / "src" / "Runner.Client" / "Runner.Client.csproj").getroot()
+        settings = [(group, child) for group in project.findall("PropertyGroup")
+                    for child in group.findall("MtouchInterpreter")]
+        self.assertEqual(1, len(settings))
+        group, setting = settings[0]
+        self.assertEqual("all", setting.text)
+        self.assertEqual("$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'", group.get("Condition"))
+        self.assertIsNone(setting.get("Condition"))
+
+    def test_runtime_check_cli_rejects_a_broken_release_configuration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "runtime-properties.json"
+            path.write_text(json.dumps(self.properties()), encoding="utf-8")
+            result = subprocess.run([sys.executable, str(HELPER), "verify-runtime", str(path)],
+                                    capture_output=True, text=True, check=True)
+            self.assertIn("MtouchInterpreter=all", result.stdout)
+            path.write_text(json.dumps(self.properties(MtouchInterpreter="")), encoding="utf-8")
+            result = subprocess.run([sys.executable, str(HELPER), "verify-runtime", str(path)],
+                                    capture_output=True, text=True)
+            self.assertEqual(1, result.returncode)
+            self.assertIn("MtouchInterpreter", result.stderr)
 
 
 class PackageTests(unittest.TestCase):

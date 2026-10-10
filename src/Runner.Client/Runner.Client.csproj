@@ -31,6 +31,13 @@
         <NuGetAudit>False</NuGetAudit>
     </PropertyGroup>
 
+    <PropertyGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+        <!-- LiteDB compiles expression trees and dynamic generic thunks at runtime.
+             Enable Mono interpretation for every assembly, including Release device builds;
+             a LiteDB-only list misses thunks created in framework/caller assemblies. -->
+        <MtouchInterpreter>all</MtouchInterpreter>
+    </PropertyGroup>
+
     <ItemGroup>
         <!-- App Icon -->
         <MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#0B0F14" />

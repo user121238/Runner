@@ -75,6 +75,27 @@ def release_version(version: str, build_number: str, *, is_tag: bool = False) ->
     return ReleaseVersion(match.group("core"), build_number, tag, prerelease)
 
 
+def verify_runtime_properties(document: dict) -> None:
+    """Check evaluated SDK properties, not just XML text or Debug defaults."""
+    properties = document.get("Properties") if isinstance(document, dict) else None
+    if not isinstance(properties, dict):
+        raise ValueError("Expected the JSON Properties object from dotnet msbuild -getProperty")
+    expected = {
+        "Configuration": "Release",
+        "TargetFramework": "net10.0-ios",
+        "RuntimeIdentifier": "ios-arm64",
+        "UseMonoRuntime": "true",
+        "MtouchInterpreter": "all",
+    }
+    for key, value in expected.items():
+        if str(properties.get(key, "")).lower() != value.lower():
+            raise ValueError(f"iOS runtime {key}: expected {value!r}, got {properties.get(key)!r}")
+    if str(properties.get("PublishAot", "")).lower() == "true":
+        raise ValueError("This LiteDB build requires the Mono interpreter, not NativeAOT PublishAot")
+    if str(properties.get("DynamicCodeSupport", "")).lower() == "false":
+        raise ValueError("DynamicCodeSupport=false disables the dynamic expression/thunk path required by LiteDB")
+
+
 def validate_plist(info: dict, version: ReleaseVersion) -> str:
     expected = {"CFBundleShortVersionString": version.display_version, "CFBundleVersion": version.build_number,
                 "CFBundleIdentifier": "com.eric.runner", "CFBundlePackageType": "APPL"}
@@ -252,6 +273,8 @@ def main() -> int:
     metadata.add_argument("--github-output", type=Path)
     toolchain = commands.add_parser("toolchain")
     toolchain.add_argument("key", choices=TOOLCHAIN)
+    runtime = commands.add_parser("verify-runtime")
+    runtime.add_argument("properties", type=Path)
     package = commands.add_parser("package")
     package.add_argument("--app", type=Path, required=True)
     package.add_argument("--output", type=Path, required=True)
@@ -262,6 +285,10 @@ def main() -> int:
     try:
         if args.command == "toolchain":
             print(TOOLCHAIN[args.key])
+            return 0
+        if args.command == "verify-runtime":
+            verify_runtime_properties(json.loads(args.properties.read_text(encoding="utf-8-sig")))
+            print("Verified iOS Release/ios-arm64 runtime: Mono with MtouchInterpreter=all")
             return 0
         version = release_version(args.tag if args.command == "metadata" and args.tag is not None else args.version,
                                   args.build_number, is_tag=args.command == "metadata" and args.tag is not None)

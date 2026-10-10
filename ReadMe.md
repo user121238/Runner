@@ -1,94 +1,179 @@
 # Runner
 
-离线跑步应用：运动会话、课程节拍、GPS 轨迹、计步、配速和历史记录。手表连接及其蓝牙、加密桥接代码已移除。
+基于 **.NET 10 MAUI** 的离线跑步应用，把运动计时、课程节拍、GPS 轨迹、计步、配速和历史记录放在同一个会话里。
 
-- Android：API 29+，保留硬件计步与加速度兜底。
-- iOS：15.0+，接入 CoreLocation、系统计步与后台音频节拍。外部音乐应用仍使用 iOS 系统播放控件。
-- 数据：公开 NuGet 的 LiteDB，沿用 `runner.db` 和原课程/记录集合，不依赖开发者本机包源。
+当前代码标签：[0.0.1-alpha](https://github.com/user121238/Runner/tree/0.0.1-alpha)，处于预发布阶段。
 
-## iOS 版本发布
+[版本与下载](https://github.com/user121238/Runner/releases) · [GitHub Actions](https://github.com/user121238/Runner/actions/workflows/ios-unsigned.yml) · [iOS 发布指南](doc/IOS_RELEASE.md)
 
-推送版本标签，例如 `v1.0.0` 或 `0.0.1-alpha`，GitHub Actions 会构建设备版 **无签名 IPA**，创建对应 Release 并上传 IPA 与 SHA-256 文件。预发布后缀保留在产物名中并标记 Pre-release，应用显示版本使用数字三段，构建号取 Actions run number。手动运行工作流只生成构建产物，不创建 Release。
+## 当前功能
 
-```bash
-git tag v1.0.0
-git push origin v1.0.0
+| 功能 | 说明 |
+| --- | --- |
+| 运动会话 | 开始、暂停、继续、结束；时长只累计跑动区间，统一管理定位、计步和节拍器 |
+| 训练课程 | 多阶段、重复轮次；每阶段设置目标步频，以及按时长或距离结束 |
+| 节拍器 | 按课程目标步频播放；步频为 0 时静音，自由跑不播放节拍 |
+| 计步与步频 | 接入手机传感器，显示累计步数和实时步频；来源随平台与设备能力变化 |
+| 距离与配速 | GPS 过滤后累计距离；显示实时、平均、最快和最慢配速，样本不足时显示 `—` |
+| 历史记录 | 本地保存课程名、时长、距离、步数、步频及采样数据；支持列表、详情和删除 |
+| 轨迹草图 | 在记录详情中绘制离线轨迹折线，没有地图底图或导航 |
+| 诊断 | 单独查看定位、计步和音频状态；运动进行中禁止诊断页重置或停止共用来源 |
+
+课程完成后停止节拍，运动会话由用户手动结束。**跑动时间不足 5 秒的会话不保存为历史记录。**
+
+手表连接、蓝牙协议和配套原生加密桥接已移除。当前范围也不包含在线地图 SDK、账户/云同步和步频偏离语音或震动提醒。
+
+## 平台支持
+
+| 平台 | 最低版本 | 原生能力 |
+| --- | --- | --- |
+| Android | Android 10 / API 29 | 优先使用硬件计步，缺少硬件来源时使用加速度兜底；GPS 与前台服务 |
+| iOS | iOS 15.0 | CoreLocation 定位、CMPedometer 系统计步、AVAudioPlayer 循环节拍 |
+
+- **音乐控制**：Android 可以向当前播放器发送系统媒体键，实际响应取决于播放器；iOS 使用系统播放控件，课程自动切歌和外部播放器控制入口隐藏。节拍器可与音乐混音。
+- **权限**：首次开始运动或进入诊断页时按需申请，而不是打开首页时申请。相关权限未授予时，对应指标缺失或降级。
+- **数据**：课程和跑步记录保存在应用数据目录的 `runner.db`。沿用原 `WorkoutPlan`、`ActivityRecord` 集合和整数 ID，兼容旧记录。
+- **依赖**：使用公开 NuGet 源；不依赖开发者本机的私有包或手表原生库。
+
+## 开发与构建
+
+以下命令从仓库根目录执行。
+
+### Android
+
+准备 .NET 10 SDK、MAUI Android workload，以及与 workload 匹配的 Android SDK / JDK。仅运行下方的 .NET 回归测试时，无需安装移动平台 workload。
+
+PowerShell 示例：
+
+```powershell
+dotnet workload install maui-android
+New-Item -ItemType Directory -Force artifacts/build | Out-Null
+
+dotnet build src/Runner.Client/Runner.Client.csproj `
+  --configuration Debug `
+  --framework net10.0-android `
+  -p:RunnerTargetFrameworks=net10.0-android `
+  -p:EmbedAssembliesIntoApk=true `
+  '-bl:artifacts/build/android-{}.binlog'
 ```
 
-无签名 IPA 留给后续自签安装；构建不需要 Apple 证书 secrets。
+APK 输出到 `src/Runner.Client/bin/Debug/net10.0-android/`。该命令只构建，不安装到设备。
 
-详见 [iOS 构建与发布](doc/IOS_RELEASE.md)、[当前路线图](doc/ROADMAP.md)、[回归测试](tests/README.md)。
+Windows 默认只启用 Android 目标；macOS 默认同时包含 Android/iOS。使用 `RunnerTargetFrameworks` 可只还原、构建指定的移动平台，`Runner.Core` 仍保持纯 `net10.0`。
 
----
+### iOS 无签名 IPA
 
-# 历史需求草案 (v1.3)
+完整设备包在 macOS 上使用 Xcode 构建。发布脚本固定以下工具链，避免 SDK 与 Xcode 版本错配：
 
-以下保留原始需求讨论，不代表当前平台范围与已实现功能；当前状态以以上说明和路线图为准。
+| 工具 | 版本 |
+| --- | --- |
+| GitHub runner | `macos-15` |
+| Xcode / iPhoneOS SDK | `26.2` |
+| .NET SDK / workload set | `10.0.103` |
+| MAUI workload | `10.0.20` |
 
-## 1. 核心技术选型更新
+确认 `dotnet --version` 为 `10.0.103`，并选择 Xcode 26.2 后：
 
-* **框架**：.NET 10 (MAUI)
-* **平台**：Android Only (API 30+)
-* **UI 风格**：**极简主义 (Minimalist)**。强调高对比度数据展示，排除复杂的装饰性元素，确保跑步过程中信息一目了然。
-* **地图策略**：首选 Google Maps，通过接口层解耦，支持未来平滑切换到高德/百度。
+```bash
+dotnet workload install maui-ios --version 10.0.103 --source https://api.nuget.org/v3/index.json
+bash scripts/build-unsigned-ipa.sh 0.0.1-alpha 1 artifacts/ios
+```
 
----
+输出为 `ios-arm64` 设备包，包含真实的 `Payload/Runner.Client.app/`，不是模拟器包。脚本校验版本、架构、签名残留、执行权限和 ZIP 结构，并生成 SHA-256 校验文件。
 
-## 2. 核心功能进阶设计
+**IPA 未签名，安装前需要使用自己的 Apple 证书、匹配的描述文件和 entitlements 重新签名。** 它不是直接用于 TestFlight 或 App Store 分发的签名包。
 
-### 2.1 智能步频检测系统 (Hybrid Cadence Detection)
+完整工具链安装、产物位置与排错见 [iOS 发布指南](doc/IOS_RELEASE.md)。
 
-系统将采取 **自动降级策略** 确保最大的设备兼容性：
+## 自动版本发布
 
-1. **一级优先**：使用 Android 硬件计步传感器 (`Sensor.TYPE_STEP_COUNTER`)。优点：功耗极低，系统级过滤，数据准确。
-2. **二级方案**：若无计步传感器，激活加速度计 (`Sensor.TYPE_ACCELEROMETER`)。
-* **自研算法**：采用三轴合力计算 + 波峰检测 (Peak Detection) + 低通滤波，实时识别步行频率。
+自动发布以 **推送 Git 标签** 为入口，普通分支推送或单独修改项目版本字段不会触发 IPA 构建。
 
+支持带或不带 `v` 的三段版本，以及 SemVer 预发布标识，例如：
 
-3. **最终方案**：若两者皆无，则关闭实际步频实时显示功能，仅进行节拍器播报。
+- 稳定版：`v1.2.3`、`1.2.3`
+- 预发布版：`0.0.1-alpha`、`0.0.1-alpha.1`
 
-### 2.2 用户自定义提醒系统 (Smart Notification)
+先提交代码改动，再推送分支和新标签。下一次预发布示例：
 
-* **阈值设置**：用户可设置步频允许的偏差范围（如  SPM）。
-* **多模态提醒**：
-* **音频反馈**：语音提示“步频过快/过慢”或改变节拍器音调。
-* **触感反馈**：手机震动提醒（支持短振/长振）。
-* **开关控制**：所有提醒逻辑均可在设置中单独开启或关闭。
+```bash
+git push origin master
+git tag -a 0.0.1-alpha.1 -m "Runner 0.0.1-alpha.1"
+git push origin 0.0.1-alpha.1
+```
 
+保留已发布标签的指向；新代码使用新标签，不覆盖已有的 `0.0.1-alpha`。
 
+工作流会依次校验版本、运行回归测试、构建并验证无签名 IPA，**全部成功后**创建对应 GitHub Release 并上传 IPA 与校验文件。带预发布标识的版本标记为 **Pre-release**。
 
-### 2.3 “插件化”地图架构
+以 `0.0.1-alpha` 为例：
 
-为实现你提到的“快速接入国内 SDK”，我们将采用 **策略模式 (Strategy Pattern)**：
+| 项目 | 值 |
+| --- | --- |
+| Git 标签 / Release 标题 | `0.0.1-alpha` |
+| 应用显示版本 | `0.0.1`，仅使用数字三段 |
+| 应用构建号 | GitHub Actions 的 `run_number` |
+| IPA 文件名 | `Runner-0.0.1-alpha-ios-arm64-unsigned.ipa` |
 
-* **定义 `IMapProvider` 接口**：包含 `StartTracking()`、`DrawPath()`、`UpdateUserLocation()` 等通用方法。
-* **当前实现**：`GoogleMapsProvider`。
-* **后续扩展**：只需新增 `AMapProvider` (高德) 实现接口，修改一行注入代码即可完成切换，无需改动运动核心逻辑。
+在 Actions 中手动运行 **iOS unsigned IPA** 时，填写 `0.0.1-alpha` 这类版本号，**只生成 Artifacts，不创建 Release**。IPA 构建产物保留 14 天，诊断日志保留 7 天。当前自动发布只打包 iOS，Android 使用本地构建流程。
 
----
+## 测试
 
-## 3. UI/UX 风格导向：极简设计
+### 算法、存储与节拍音频
 
-为了符合你要求的“简洁”：
+```powershell
+dotnet test tests/Runner.Core.Tests/Runner.Core.Tests.csproj `
+  --configuration Release `
+  --logger trx `
+  --results-directory artifacts/tests `
+  '-bl:artifacts/tests/test-{}.binlog'
+```
 
-* **数据大屏**：跑步主界面仅保留 3-4 个核心指标（时长、距离、实际步频、目标步频），使用加粗的大号无衬线字体。
-* **高对比度**：采用黑白底色或深色模式，减少渐变和投影。
-* **交互逻辑**：所有操作尽量通过大按钮实现，防止跑步中误触。
+测试直接引用 Core，并链接无平台依赖的生产 Store 与 PCM 处理源码；覆盖会话状态、定位过滤、计步、课程推进、配速、旧数据库兼容和节拍音频生成。覆盖率与详细边界见 [测试说明](tests/README.md)。
 
----
+### 发布脚本
 
-## 4. 数据库结构设计 (LiteDB)
+Python 3.10+，仅使用标准库。Windows / PowerShell：
 
-考虑到离线存储和数据结构化，LiteDB 的集合建议如下：
+```powershell
+$env:PYTHONUTF8 = "1"
+python -m unittest discover -s scripts/tests -v
+```
 
-* **Workouts (训练定义)**：存储课程设置，如 `[{Stage: 1, Duration: 300s, TargetSPM: 180, AutoNextTrack: true}]`。
-* **Activities (运动记录)**：
-* `StartTime` / `EndTime`
-* `TotalDistance` / `AverageCadence`
-* `TrackPoints` (List of Coordinates: Lat, Lng, Alt, Time)
-* `CadencePoints` (List of Actual SPM vs Time)
+macOS / Linux：
 
+```bash
+PYTHONUTF8=1 python3 -m unittest discover -s scripts/tests -v
+bash -n scripts/build-unsigned-ipa.sh
+```
 
-* **Settings**：用户偏好、提醒开关、自定义音效路径。
+截至 `0.0.1-alpha`，本地已通过 **234 项 .NET 回归测试、27 项发布脚本测试**，以及 Android Debug 完整构建、iOS Release 托管代码编译。托管编译与结构测试不等于 iOS AOT 打包或 iPhone 真机验收通过；云端构建状态以 [Actions](https://github.com/user121238/Runner/actions/workflows/ios-unsigned.yml) 为准。
 
----
+## 已知限制与验收范围
+
+- GPS、步数和配速受定位质量、设备传感器及携带方式影响；合成信号测试不代表真实测量精度。
+- 实时配速使用时间窗，最快/最慢配速使用距离窗；短距离、低质量或稀疏定位可能缺少配速结果。
+- 后台运动受平台权限与系统策略约束。iOS 无定位且当前不播放节拍时，应用可能被挂起，阶段推进会延后。
+- iPhone 授权流程、长时间锁屏、来电后的音频恢复，以及室外已知路线和加速度兜底精度，仍需真机验收。
+
+## 主要目录
+
+```text
+src/Runner.Core/          纯 .NET 算法、会话状态、课程和记录模型
+src/Runner.Business/      共用会话控制、平台适配与 LiteDB 存储
+src/Runner.Client/        MAUI 页面、Prism 导航、资源与依赖注册
+tests/Runner.Core.Tests/  算法、存储兼容与 PCM 回归测试
+scripts/                 IPA 打包、版本校验与脚本测试
+.github/workflows/       标签驱动的 iOS 构建与 Release 发布
+doc/                     路线图、算法验证与发布指南
+```
+
+业务依赖方向为 `Runner.Client → Runner.Business → Runner.Core`。包版本集中在 [Directory.Packages.props](Directory.Packages.props)，平台差异收敛在 `IRunPlatform`，两端共用会话与课程逻辑。
+
+## 文档
+
+- [路线图与验收清单](doc/ROADMAP.md)
+- [算法验证记录](doc/ALGORITHM_VALIDATION.md)
+- [iOS 无签名 IPA 与 Release](doc/IOS_RELEASE.md)
+- [回归测试说明](tests/README.md)
+- [历史需求草案](doc/Runner.md)：保留讨论背景，不作为当前功能清单

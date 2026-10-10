@@ -19,7 +19,7 @@
         <Nullable>enable</Nullable>
 
         <!-- Display name -->
-        <ApplicationTitle>Runner.Client</ApplicationTitle>
+        <ApplicationTitle>Runner</ApplicationTitle>
 
         <!-- App Identifier -->
         <ApplicationId>com.eric.runner</ApplicationId>

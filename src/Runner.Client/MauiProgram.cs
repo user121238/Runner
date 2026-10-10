@@ -2,6 +2,7 @@
 using DM.Maui.Framework.Data.Extensions;
 using Microsoft.Extensions.Logging;
 using Prism.Ioc;
+using Runner.Business.Platforms.Android.Services;
 using Runner.Business.Platforms.Android.Session;
 using Runner.Business.Services.Activities;
 using Runner.Business.Services.Ble;
@@ -46,6 +47,9 @@ namespace Runner.Client
             builder.Services.AddLiteDbDataAccess(dbPath);
             builder.Services.AddSingleton<WorkoutStore>();
             builder.Services.AddSingleton<ActivityStore>();
+
+            // 前台服务通知用同款 R 小图标：资源在应用工程里，服务在 Business，启动时指定
+            RunnerService.SmallIconResourceId = ResourceConstant.Drawable.ic_stat_runner;
 
             // 运动会话宿主：应用级单例，持有 GPS / 计步 / 节拍器、当前课程，结束后落盘记录
             builder.Services.AddSingleton(sp => new RunSessionHost(

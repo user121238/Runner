@@ -4,114 +4,130 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:vm="clr-namespace:Runner.Client.ViewModels"
              Title="诊断"
-             x:DataType="vm:DiagnosticsPageViewModel">
+             x:DataType="vm:DiagnosticsPageViewModel"
+             BackgroundColor="{StaticResource Bg}">
 
-    <ScrollView>
-        <VerticalStackLayout Padding="20" Spacing="15">
-            <Label Text="{Binding DiagnosticNotice}" />
-            <Label Text="{Binding MusicControlStatus}" />
+    <ContentPage.Resources>
+        <!--  调试操作按钮：次要胶囊压到 44 高，三个并排放得下；禁用时文字退成三级色，能看出当前不可点  -->
+        <Style x:Key="ActionButton" BasedOn="{StaticResource SecondaryButton}" TargetType="Button">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="HeightRequest" Value="44" />
+            <Setter Property="CornerRadius" Value="22" />
+            <Setter Property="Padding" Value="4,0" />
+            <Setter Property="VisualStateManager.VisualStateGroups">
+                <VisualStateGroupList>
+                    <VisualStateGroup x:Name="CommonStates">
+                        <VisualState x:Name="Normal" />
+                        <VisualState x:Name="Disabled">
+                            <VisualState.Setters>
+                                <Setter Property="TextColor" Value="{StaticResource TextTertiary}" />
+                            </VisualState.Setters>
+                        </VisualState>
+                    </VisualStateGroup>
+                </VisualStateGroupList>
+            </Setter>
+        </Style>
+        <Style x:Key="StatValue" BasedOn="{StaticResource Metric}" TargetType="Label">
+            <Setter Property="FontSize" Value="24" />
+        </Style>
+    </ContentPage.Resources>
+
+    <ScrollView VerticalScrollBarVisibility="Never">
+        <VerticalStackLayout Padding="20,12,20,24" Spacing="14">
+            <Label Style="{StaticResource Hint}" Text="{Binding DiagnosticNotice}" />
+            <Label Style="{StaticResource Caption}" Text="{Binding MusicControlStatus}" />
+
             <!--  媒体控制  -->
-            <Border Padding="15" BackgroundColor="LightGray" IsVisible="{Binding CanControlMusic}">
-                <VerticalStackLayout Spacing="10">
-                    <Label FontAttributes="Bold" FontSize="18" Text="媒体控制" />
-                    <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
-                        <Button Command="{Binding PreviousTrackCommand}" HeightRequest="50" Text="上一首" WidthRequest="100" />
-                        <Button Command="{Binding PlayPauseCommand}" HeightRequest="50" Text="播放/暂停" WidthRequest="100" />
-                        <Button Command="{Binding NextTrackCommand}" HeightRequest="50" Text="下一首" WidthRequest="100" />
-                    </HorizontalStackLayout>
-                </VerticalStackLayout>
-            </Border>
-
-            <!--  iOS 播放控制测试：真机对照 MediaRemote 私有协议与快捷指令，验证能否控制正在播放的音乐  -->
-            <Border Padding="15" BackgroundColor="LightGoldenrodYellow" IsVisible="{Binding CanTestIosMedia}">
-                <VerticalStackLayout Spacing="10">
-                    <Label FontAttributes="Bold" FontSize="18" Text="iOS 播放控制测试" />
-                    <Label FontSize="12" Text="先让音乐 App 播放，再逐组点按按钮，听声音确认是否生效。" />
-
-                    <Label FontAttributes="Bold" Text="MediaRemote 私有协议" />
-                    <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
-                        <Button Command="{Binding MediaRemotePreviousCommand}" HeightRequest="50" Text="上一首" />
-                        <Button Grid.Column="1" Command="{Binding MediaRemoteNextCommand}" HeightRequest="50" Text="下一首" />
-                        <Button Grid.Column="2" Command="{Binding MediaRemotePauseCommand}" HeightRequest="50" Text="暂停" />
-                        <Button Grid.Column="3" Command="{Binding MediaRemotePlayCommand}" HeightRequest="50" Text="播放" />
+            <Border IsVisible="{Binding CanControlMusic}" Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Style="{StaticResource CardTitle}" Text="媒体控制" />
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                        <Button Command="{Binding PreviousTrackCommand}" Style="{StaticResource ActionButton}" Text="上一首" />
+                        <Button Grid.Column="1" Command="{Binding PlayPauseCommand}" Style="{StaticResource ActionButton}" Text="播放/暂停" />
+                        <Button Grid.Column="2" Command="{Binding NextTrackCommand}" Style="{StaticResource ActionButton}" Text="下一首" />
                     </Grid>
-                    <Label Text="{Binding MediaRemoteStatus, StringFormat='状态: {0}'}" />
-
-                    <Label FontAttributes="Bold" Text="快捷指令" />
-                    <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="8">
-                        <Button Command="{Binding ShortcutsPreviousCommand}" HeightRequest="50" Text="上一首" />
-                        <Button Grid.Column="1" Command="{Binding ShortcutsNextCommand}" HeightRequest="50" Text="下一首" />
-                        <Button Grid.Column="2" Command="{Binding ShortcutsPauseCommand}" HeightRequest="50" Text="暂停" />
-                        <Button Grid.Column="3" Command="{Binding ShortcutsPlayCommand}" HeightRequest="50" Text="播放" />
-                    </Grid>
-                    <Label Text="{Binding ShortcutsStatus, StringFormat='状态: {0}'}" />
-                    <Label FontSize="12" Text="需先在快捷指令 App 创建 4 个同名快捷指令：上一首、下一首、暂停、播放。" />
                 </VerticalStackLayout>
             </Border>
 
             <!--  节拍器  -->
-            <Border Padding="15" BackgroundColor="LightBlue">
-                <VerticalStackLayout Spacing="10">
-                    <Label FontAttributes="Bold" FontSize="18" Text="节拍器控制" />
-                    <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
-                        <Button Command="{Binding StartTickCommand}" HeightRequest="50" Text="开始节拍" WidthRequest="120" />
-                        <Button Command="{Binding StopTickCommand}" HeightRequest="50" Text="停止节拍" WidthRequest="120" />
-                    </HorizontalStackLayout>
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Style="{StaticResource CardTitle}" Text="节拍器控制" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <Button Command="{Binding StartTickCommand}" Style="{StaticResource ActionButton}" Text="开始节拍" />
+                        <Button Grid.Column="1" Command="{Binding StopTickCommand}" Style="{StaticResource ActionButton}" Text="停止节拍" />
+                    </Grid>
                 </VerticalStackLayout>
             </Border>
 
             <!--  计步器控制  -->
-            <Border Padding="15" BackgroundColor="LightGreen">
-                <VerticalStackLayout Spacing="10">
-                    <Label FontAttributes="Bold" FontSize="18" Text="计步器控制" />
-                    <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
-                        <Button Command="{Binding StartPedometerCommand}" HeightRequest="50" Text="开始计步" WidthRequest="100" />
-                        <Button Command="{Binding StopPedometerCommand}" HeightRequest="50" Text="停止计步" WidthRequest="100" />
-                        <Button Command="{Binding ResetStepCountCommand}" HeightRequest="50" Text="重置计数" WidthRequest="100" />
-                    </HorizontalStackLayout>
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Style="{StaticResource CardTitle}" Text="计步器控制" />
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                        <Button Command="{Binding StartPedometerCommand}" Style="{StaticResource ActionButton}" Text="开始计步" />
+                        <Button Grid.Column="1" Command="{Binding StopPedometerCommand}" Style="{StaticResource ActionButton}" Text="停止计步" />
+                        <Button Grid.Column="2" Command="{Binding ResetStepCountCommand}" Style="{StaticResource ActionButton}" Text="重置计数" />
+                    </Grid>
                 </VerticalStackLayout>
             </Border>
 
             <!--  计步器数据  -->
-            <Border Padding="15" BackgroundColor="LightYellow">
-                <VerticalStackLayout Spacing="10">
-                    <Label FontAttributes="Bold" FontSize="18" Text="计步器数据" />
-                    <Label Text="{Binding PedometerStatus, StringFormat='状态: {0}'}" />
-                    <Label FontAttributes="Bold" FontSize="20" Text="{Binding StepCount, StringFormat='步数: {0}'}" />
-                    <Label FontAttributes="Bold" FontSize="20" Text="{Binding StepFrequency, StringFormat='步频: {0:F1} SPM'}" />
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Style="{StaticResource CardTitle}" Text="计步器数据" />
+                    <Label Style="{StaticResource CardDetail}" Text="{Binding PedometerStatus, StringFormat='状态: {0}'}" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Style="{StaticResource StatValue}" Text="{Binding StepCount}" />
+                            <Label Style="{StaticResource MetricCaption}" Text="步数" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Style="{StaticResource StatValue}" Text="{Binding StepFrequency, StringFormat='{0:F1}'}" />
+                            <Label Style="{StaticResource MetricCaption}" Text="步频 SPM" />
+                        </VerticalStackLayout>
+                    </Grid>
                 </VerticalStackLayout>
             </Border>
 
             <!--  传感器切换  -->
-            <Border Padding="15" BackgroundColor="LightCoral" IsVisible="{Binding CanSwitchStepCounter}">
-                <VerticalStackLayout Spacing="10">
-                    <Label FontAttributes="Bold" FontSize="18" Text="传感器切换" />
-                    <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
-                        <Button Command="{Binding SwitchToHardwareCommand}" HeightRequest="50" Text="硬件传感器" WidthRequest="120" />
-                        <Button Command="{Binding SwitchToAccelerometerCommand}" HeightRequest="50" Text="加速度传感器" WidthRequest="120" />
-                    </HorizontalStackLayout>
+            <Border IsVisible="{Binding CanSwitchStepCounter}" Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Style="{StaticResource CardTitle}" Text="传感器切换" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <Button Command="{Binding SwitchToHardwareCommand}" Style="{StaticResource ActionButton}" Text="硬件传感器" />
+                        <Button Grid.Column="1" Command="{Binding SwitchToAccelerometerCommand}" Style="{StaticResource ActionButton}" Text="加速度传感器" />
+                    </Grid>
                 </VerticalStackLayout>
             </Border>
 
             <!--  GPS 控制  -->
-            <Border Padding="15" BackgroundColor="LightSkyBlue">
-                <VerticalStackLayout Spacing="10">
-                    <Label FontAttributes="Bold" FontSize="18" Text="GPS 距离追踪" />
-                    <HorizontalStackLayout HorizontalOptions="Center" Spacing="10">
-                        <Button Command="{Binding StartGpsTrackingCommand}" HeightRequest="50" Text="开始追踪" WidthRequest="100" />
-                        <Button Command="{Binding StopGpsTrackingCommand}" HeightRequest="50" Text="停止追踪" WidthRequest="100" />
-                        <Button Command="{Binding ResetGpsDistanceCommand}" HeightRequest="50" Text="重置距离" WidthRequest="100" />
-                    </HorizontalStackLayout>
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Style="{StaticResource CardTitle}" Text="GPS 距离追踪" />
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                        <Button Command="{Binding StartGpsTrackingCommand}" Style="{StaticResource ActionButton}" Text="开始追踪" />
+                        <Button Grid.Column="1" Command="{Binding StopGpsTrackingCommand}" Style="{StaticResource ActionButton}" Text="停止追踪" />
+                        <Button Grid.Column="2" Command="{Binding ResetGpsDistanceCommand}" Style="{StaticResource ActionButton}" Text="重置距离" />
+                    </Grid>
                 </VerticalStackLayout>
             </Border>
 
             <!--  GPS 数据  -->
-            <Border Padding="15" BackgroundColor="LightCyan">
-                <VerticalStackLayout Spacing="10">
-                    <Label FontAttributes="Bold" FontSize="18" Text="GPS 数据" />
-                    <Label Text="{Binding GpsStatus, StringFormat='状态: {0}'}" />
-                    <Label FontAttributes="Bold" FontSize="24" Text="{Binding GpsDistance, StringFormat='距离: {0:F3} 公里'}" />
-                    <Label FontAttributes="Bold" FontSize="20" Text="{Binding GpsSpeed, StringFormat='速度: {0:F1} 公里/小时'}" />
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+                    <Label Style="{StaticResource CardTitle}" Text="GPS 数据" />
+                    <Label Style="{StaticResource CardDetail}" Text="{Binding GpsStatus, StringFormat='状态: {0}'}" />
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                        <VerticalStackLayout Spacing="2">
+                            <Label Style="{StaticResource StatValue}" Text="{Binding GpsDistance, StringFormat='{0:F3}'}" />
+                            <Label Style="{StaticResource MetricCaption}" Text="公里" />
+                        </VerticalStackLayout>
+                        <VerticalStackLayout Grid.Column="1" Spacing="2">
+                            <Label Style="{StaticResource StatValue}" Text="{Binding GpsSpeed, StringFormat='{0:F1}'}" />
+                            <Label Style="{StaticResource MetricCaption}" Text="公里/小时" />
+                        </VerticalStackLayout>
+                    </Grid>
                 </VerticalStackLayout>
             </Border>
         </VerticalStackLayout>

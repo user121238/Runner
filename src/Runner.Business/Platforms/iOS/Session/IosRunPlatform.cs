@@ -15,15 +15,18 @@ public sealed class IosRunPlatform : IRunPlatform
 {
     public TimeProvider Clock { get; } = new SensorClock(IosMonotonicClock.GetNanoseconds);
     public bool CanSwitchStepCounter => false;
-    public bool CanControlMusic => false;
-    public string MusicControlStatus => "Runner 当前未接入播放器控制；可用耳机或 iOS 控制中心切歌，节拍器可与音乐混音。";
+    // MediaRemote 是私有框架：加载失败就如实报不可用，而不是让按钮出现后再抛异常。
+    public bool CanControlMusic => MediaRemoteController.TryLoad();
+    public string MusicControlStatus => MediaRemoteController.TryLoad()
+        ? "通过 MediaRemote 向当前媒体应用发送播放控制命令"
+        : $"MediaRemote 不可用: {MediaRemoteController.LoadError}";
 
     public ICadencePlayer CreateCadencePlayer() => new IosCadencePlayer("beep3.wav");
 
     public async Task<(IStepCounter? Counter, string Status)> CreateStepCounterAsync(bool forceAccelerometer)
     {
         if (!CMPedometer.IsStepCountingAvailable) return (null, "设备不支持系统计步，仅节拍器模式");
-        if (!await IosStepCounter.RequestPermissionAsync()) return (null, "需要运动与健身权限");
+        if (!await IosStepCounter.RequestPermissionAsync()) return (null, "需要运动与健身权限（设置 → Runner → 运动与健身）");
         return (new IosStepCounter(Clock), "iOS 系统计步");
     }
 
@@ -34,7 +37,7 @@ public sealed class IosRunPlatform : IRunPlatform
             status = await MauiPermissions.RequestAsync<MauiPermissions.LocationWhenInUse>();
         return status == PermissionStatus.Granted
             ? (new IosLocationTracker(Clock), "已就绪")
-            : (null, "需要位置权限");
+            : (null, status == PermissionStatus.Denied ? "位置权限被拒绝（设置 → Runner → 位置）" : "需要位置权限");
     }
 
     public Task PrepareAsync() => Task.CompletedTask;
@@ -44,7 +47,7 @@ public sealed class IosRunPlatform : IRunPlatform
     public void StartBackgroundSession(bool hasLocation) { }
     public void StopBackgroundSession() { }
 
-    public void NextTrack() => throw new NotSupportedException(MusicControlStatus);
-    public void PreviousTrack() => throw new NotSupportedException(MusicControlStatus);
-    public void PlayPause() => throw new NotSupportedException(MusicControlStatus);
+    public void NextTrack() => MediaRemoteController.Send(MediaRemoteCommand.NextTrack);
+    public void PreviousTrack() => MediaRemoteController.Send(MediaRemoteCommand.PreviousTrack);
+    public void PlayPause() => MediaRemoteController.Send(MediaRemoteCommand.TogglePlayPause);
 }

@@ -77,6 +77,7 @@ public sealed class RunSessionHost : IDisposable
             var previousLocation = _locationTracker;
             if (_stepCounter == null) await CreateStepCounterAsync(false);
             if (_locationTracker == null) await CreateLocationTrackerAsync();
+            ReportMissingSources();
             try { await _platform.PrepareAsync(); }
             catch (Exception ex) { _logger.LogWarning(ex, "准备平台运动服务失败"); }
 
@@ -148,6 +149,16 @@ public sealed class RunSessionHost : IDisposable
             _logger.LogError(ex, "创建 GPS 追踪器失败");
             LocationStatus = $"创建失败: {ex.Message}";
         }
+    }
+
+    /// <summary>来源缺失时把原因带到界面：权限被拒或设备不支持，不能静默地跑一次没有数据来源的会话。</summary>
+    private void ReportMissingSources()
+    {
+        if (_stepCounter != null && _locationTracker != null) return;
+        var reasons = new List<string>(2);
+        if (_locationTracker == null) reasons.Add(LocationStatus);
+        if (_stepCounter == null) reasons.Add(StepCounterStatus);
+        Notice?.Invoke(string.Join("；", reasons));
     }
 
     private void RebuildController()

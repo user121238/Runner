@@ -1,5 +1,6 @@
 using CoreLocation;
 using Foundation;
+using Runner.Business.Diagnostics;
 using Runner.Business.Location;
 using Runner.Core.Geolocation;
 
@@ -52,18 +53,22 @@ public sealed class IosLocationTracker : ILocationTracker
         _manager.StartUpdatingLocation();
         _isTracking = true;
         _speedTimer = new Timer(_ => RefreshSpeed(), null, 1000, 1000);
+        DiagnosticLog.Write("GPS", $"开始定位 授权={_manager.AuthorizationStatus} 精度授权={_manager.AccuracyAuthorization}");
         OnStatusUpdated?.Invoke("正在定位，请到开阔处");
         return Task.CompletedTask;
     }
 
     public void Stop()
     {
+        bool wasTracking = _isTracking;
         _isTracking = false;
         _speedTimer?.Dispose();
         _speedTimer = null;
         _manager.StopUpdatingLocation();
         _manager.AllowsBackgroundLocationUpdates = false;
         _distanceTracker.BeginSegment();
+        if (wasTracking)
+            DiagnosticLog.Write("GPS", $"停止定位 累计={_distanceTracker.TotalDistanceMeters:F1}m 轨迹点={_distanceTracker.TrajectoryPointCount}");
         OnSpeedUpdated?.Invoke(0);
         OnStatusUpdated?.Invoke("已停止");
     }
@@ -81,14 +86,22 @@ public sealed class IosLocationTracker : ILocationTracker
         try
         {
             var wallTime = DateTimeOffset.UnixEpoch.AddSeconds(location.Timestamp.SecondsSince1970);
-            var sampleTime = _clock.GetUtcNow() - (DateTimeOffset.UtcNow - wallTime);
+            var age = DateTimeOffset.UtcNow - wallTime;
+            var sampleTime = _clock.GetUtcNow() - age;
             // 在单调时钟上判定分段，避免用户调整墙钟后拒绝后续所有位置。
-            if (sampleTime < _segmentStartTime) return;
+            if (sampleTime < _segmentStartTime)
+            {
+                DiagnosticLog.Write("GPS", $"忽略早于本段的缓存点 龄={age.TotalSeconds:F1}s ±{location.HorizontalAccuracy:F1}m");
+                return;
+            }
             var point = new GeoCoordinate(location.Coordinate.Latitude, location.Coordinate.Longitude,
                 location.Altitude, sampleTime,
                 location.HorizontalAccuracy >= 0 ? location.HorizontalAccuracy : double.PositiveInfinity,
                 location.Speed >= 0 ? location.Speed : null);
+            var anchor = _distanceTracker.LastAcceptedLocation;
             bool accepted = _distanceTracker.AddLocation(point, out var result);
+            string anchorDistance = anchor is GeoCoordinate a ? GeoCalculator.CalculateDistance(a, point).ToString("F1") : "-";
+            DiagnosticLog.Write("GPS", $"{result} ±{location.HorizontalAccuracy:F1}m v={location.Speed:F1}m/s 龄={age.TotalSeconds:F1}s 距锚点={anchorDistance}m 累计={_distanceTracker.TotalDistanceMeters:F1}m 点={_distanceTracker.TrajectoryPointCount} ({location.Coordinate.Latitude:F5},{location.Coordinate.Longitude:F5})");
             OnStatusUpdated?.Invoke(result switch
             {
                 FilterResult.Accept => $"GPS有效 ±{location.HorizontalAccuracy:F1}米 · {_distanceTracker.TrajectoryPointCount}个轨迹点",
@@ -143,7 +156,11 @@ public sealed class IosLocationTracker : ILocationTracker
 
         public override void Failed(CLLocationManager manager, NSError error)
         {
+            DiagnosticLog.Write("GPS", $"CLLocationManager 失败 code={error.Code} {error.LocalizedDescription}");
             if (owner._isTracking) owner.OnError?.Invoke($"定位失败: {error.LocalizedDescription}");
         }
+
+        public override void DidChangeAuthorization(CLLocationManager manager) =>
+            DiagnosticLog.Write("GPS", $"授权变化 {manager.AuthorizationStatus} 精度={manager.AccuracyAuthorization}");
     }
 }

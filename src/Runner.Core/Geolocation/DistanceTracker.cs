@@ -26,6 +26,8 @@ public class DistanceTracker
     public int TrajectoryPointCount { get { lock (_lock) return _trajectory.Count; } }
     // 真正的快照：调用方枚举时不受传感器回调修改影响。
     public IReadOnlyList<GeoCoordinate> Trajectory { get { lock (_lock) return _trajectory.ToArray(); } }
+    /// <summary>过滤器当前的位移锚点；诊断时对照"位移未超过精度门限"用。</summary>
+    public GeoCoordinate? LastAcceptedLocation { get { lock (_lock) return _filter.LastAcceptedLocation; } }
 
     public bool AddLocation(GeoCoordinate location) => AddLocation(location, out _);
 

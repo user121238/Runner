@@ -1,5 +1,6 @@
 using CoreMotion;
 using Foundation;
+using Runner.Business.Diagnostics;
 using Runner.Business.StepCounter;
 
 namespace Runner.Business.Platforms.iOS.StepCounter;
@@ -16,6 +17,7 @@ public sealed class IosStepCounter(TimeProvider clock) : IStepCounter
     private double _lastSampleTime;
     private long _lastCadenceTimestamp;
     private bool _running;
+    private bool _cadenceExpired;
     private bool _disposed;
 
     public event Action<int>? OnStepCountChanged;
@@ -50,7 +52,9 @@ public sealed class IosStepCounter(TimeProvider clock) : IStepCounter
         _lastSampleTime = start.SecondsSince1970;
         _lastCadenceTimestamp = clock.GetTimestamp();
         _running = true;
+        _cadenceExpired = false;
         int generation = ++_generation;
+        DiagnosticLog.Write("计步", $"开始 CMPedometer 授权={CMPedometer.AuthorizationStatus} 步频可用={CMPedometer.IsCadenceAvailable}");
         _pedometer.StartPedometerUpdates(start, (data, error) => OnNativeUpdate(generation, data, error));
         _timer = new Timer(_ => MainThread.BeginInvokeOnMainThread(() => ExpireCadence(generation)), null, 1000, 1000);
     }
@@ -68,14 +72,22 @@ public sealed class IosStepCounter(TimeProvider clock) : IStepCounter
             if (!_running || generation != _generation) return;
             if (errorText != null)
             {
+                DiagnosticLog.Write("计步", $"CMPedometer 错误 {errorText}");
                 OnError?.Invoke($"计步失败: {errorText}");
                 return;
             }
-            if (!hasData || steps < _lastSegmentSteps) return;
+            if (!hasData || steps < _lastSegmentSteps)
+            {
+                DiagnosticLog.Write("计步", $"忽略回调 hasData={hasData} steps={steps} 上次={_lastSegmentSteps}");
+                return;
+            }
             int increment = steps - _lastSegmentSteps;
             double seconds = endTime - _lastSampleTime;
             double actualCadence = cadence is >= 0 ? cadence.Value * 60
                 : seconds > 0 ? increment / seconds * 60 : 0;
+            string nativeCadence = cadence is double perSecond ? (perSecond * 60).ToString("F0") : "null";
+            DiagnosticLog.Write("计步", $"steps={steps} 增量={increment} Δt={seconds:F1}s 原生步频={nativeCadence} 采用={actualCadence:F0} 距上次回调={clock.GetElapsedTime(_lastCadenceTimestamp).TotalSeconds:F1}s");
+            _cadenceExpired = false;
             _totalSteps = checked(_stepsBeforeSegment + steps);
             _lastSegmentSteps = steps;
             _lastSampleTime = endTime;
@@ -87,12 +99,20 @@ public sealed class IosStepCounter(TimeProvider clock) : IStepCounter
 
     private void ExpireCadence(int generation)
     {
-        if (_running && generation == _generation && clock.GetElapsedTime(_lastCadenceTimestamp).TotalSeconds >= 3)
-            OnStepFrequencyChanged?.Invoke(0);
+        if (!_running || generation != _generation) return;
+        double idle = clock.GetElapsedTime(_lastCadenceTimestamp).TotalSeconds;
+        if (idle < 3) return;
+        if (!_cadenceExpired)
+        {
+            _cadenceExpired = true;
+            DiagnosticLog.Write("计步", $"{idle:F1}s 无回调，步频归零");
+        }
+        OnStepFrequencyChanged?.Invoke(0);
     }
 
     public void Stop()
     {
+        if (_running) DiagnosticLog.Write("计步", $"停止 累计步数={_totalSteps}");
         _running = false;
         ++_generation;
         _timer?.Dispose();

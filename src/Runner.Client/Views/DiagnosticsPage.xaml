@@ -130,6 +130,25 @@
                     </Grid>
                 </VerticalStackLayout>
             </Border>
+
+            <!--  事件日志：原生回调原始值、会话生命周期、错误；这里只显示最近 60 条，导出含全部  -->
+            <Border Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Label Style="{StaticResource CardTitle}" Text="事件日志" />
+                        <Label Grid.Column="1"
+                               Style="{StaticResource CardDetail}"
+                               Text="{Binding LogCount, StringFormat='{0} 条'}"
+                               VerticalOptions="Center" />
+                    </Grid>
+                    <Grid ColumnDefinitions="*,*,*" ColumnSpacing="8">
+                        <Button Command="{Binding ExportLogTextCommand}" Style="{StaticResource ActionButton}" Text="导出 TXT" />
+                        <Button Grid.Column="1" Command="{Binding ExportLogJsonCommand}" Style="{StaticResource ActionButton}" Text="导出 JSON" />
+                        <Button Grid.Column="2" Command="{Binding ClearLogCommand}" Style="{StaticResource ActionButton}" Text="清空" />
+                    </Grid>
+                    <Label LineBreakMode="WordWrap" Style="{StaticResource Caption}" Text="{Binding LogText}" />
+                </VerticalStackLayout>
+            </Border>
         </VerticalStackLayout>
     </ScrollView>
 

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Runner.Business.Diagnostics;
 using Runner.Business.Location;
 using Runner.Business.Media;
 using Runner.Business.Services.Activities;
@@ -77,6 +78,7 @@ public sealed class RunSessionHost : IDisposable
             var previousLocation = _locationTracker;
             if (_stepCounter == null) await CreateStepCounterAsync(false);
             if (_locationTracker == null) await CreateLocationTrackerAsync();
+            DiagnosticLog.Write("宿主", $"初始化 计步={StepCounterStatus} 定位={LocationStatus} 音乐={_platform.MusicControlStatus}");
             ReportMissingSources();
             try { await _platform.PrepareAsync(); }
             catch (Exception ex) { _logger.LogWarning(ex, "准备平台运动服务失败"); }
@@ -182,6 +184,8 @@ public sealed class RunSessionHost : IDisposable
     private void ReportError(string message, Exception? exception = null)
     {
         LastErrorDetails = exception?.ToString() ?? message;
+        // 控制器的错误它自己已经记过日志；带异常进来的才是宿主自己的（节拍音加载、落盘）。
+        if (exception != null) DiagnosticLog.Write("宿主", message);
         Error?.Invoke(message);
     }
 
@@ -197,6 +201,7 @@ public sealed class RunSessionHost : IDisposable
         {
             await Activities.SaveAsync(record);
             LastErrorDetails = "";
+            DiagnosticLog.Write("宿主", $"记录已保存 距离={record.DistanceMeters:F0}m 时长={record.ElapsedSeconds:F0}s");
             Notice?.Invoke("记录已保存");
         }
         catch (Exception ex)

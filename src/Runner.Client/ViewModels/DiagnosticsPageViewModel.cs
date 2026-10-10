@@ -1,6 +1,8 @@
-﻿using Prism.Commands;
+﻿using Microsoft.Maui.ApplicationModel.DataTransfer;
+using Prism.Commands;
 using Prism.Mvvm;
 using Prism.Navigation;
+using Runner.Business.Diagnostics;
 using Runner.Business.Location;
 using Runner.Business.Session;
 using Runner.Business.StepCounter;
@@ -11,6 +13,7 @@ namespace Runner.Client.ViewModels;
 public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestructible
 {
     private const int MetronomeCadence = 180;
+    private const int VisibleLogLines = 60;
     private readonly RunSessionHost _host;
     private IStepCounter? _stepCounter;
     private ILocationTracker? _locationTracker;
@@ -23,6 +26,8 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
     private double _gpsDistance;
     private double _gpsSpeed;
     private string _gpsStatus = "";
+    private string _logText = "";
+    private int _logCount;
 
     public DiagnosticsPageViewModel(RunSessionHost host)
     {
@@ -41,7 +46,12 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
         StartGpsTrackingCommand = new AsyncDelegateCommand(StartGpsTrackingAsync, CanModify);
         StopGpsTrackingCommand = new DelegateCommand(() => RunDiagnostic(StopGpsTracking), CanModify);
         ResetGpsDistanceCommand = new DelegateCommand(() => RunDiagnostic(ResetGpsDistance), CanModify);
+        ExportLogTextCommand = new AsyncDelegateCommand(() => ExportLogAsync(json: false));
+        ExportLogJsonCommand = new AsyncDelegateCommand(() => ExportLogAsync(json: true));
+        ClearLogCommand = new DelegateCommand(DiagnosticLog.Clear);
         _host.Updated += OnHostUpdated;
+        DiagnosticLog.Changed += OnLogChanged;
+        RefreshLog();
         RefreshAvailability();
     }
 
@@ -58,6 +68,9 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
     public AsyncDelegateCommand StartGpsTrackingCommand { get; }
     public DelegateCommand StopGpsTrackingCommand { get; }
     public DelegateCommand ResetGpsDistanceCommand { get; }
+    public AsyncDelegateCommand ExportLogTextCommand { get; }
+    public AsyncDelegateCommand ExportLogJsonCommand { get; }
+    public DelegateCommand ClearLogCommand { get; }
 
     public int StepCount { get => _stepCount; private set => SetProperty(ref _stepCount, value); }
     public double StepFrequency { get => _stepFrequency; private set => SetProperty(ref _stepFrequency, value); }
@@ -65,6 +78,8 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
     public double GpsDistance { get => _gpsDistance; private set => SetProperty(ref _gpsDistance, value); }
     public double GpsSpeed { get => _gpsSpeed; private set => SetProperty(ref _gpsSpeed, value); }
     public string GpsStatus { get => _gpsStatus; private set => SetProperty(ref _gpsStatus, value); }
+    public string LogText { get => _logText; private set => SetProperty(ref _logText, value); }
+    public int LogCount { get => _logCount; private set => SetProperty(ref _logCount, value); }
     public bool CanControlMusic => _host.CanControlMusic;
     public bool CanSwitchStepCounter => _host.CanSwitchStepCounter;
     public string MusicControlStatus => _host.MusicControlStatus;
@@ -166,6 +181,7 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
     public void Destroy()
     {
         _host.Updated -= OnHostUpdated;
+        DiagnosticLog.Changed -= OnLogChanged;
         UnbindSources();
     }
 
@@ -281,6 +297,38 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
         _locationTracker?.Reset();
         GpsDistance = 0;
         GpsSpeed = 0;
+    }
+
+    #endregion
+
+    #region 事件日志
+
+    private void OnLogChanged() => MainThread.BeginInvokeOnMainThread(RefreshLog);
+
+    private void RefreshLog()
+    {
+        LogCount = DiagnosticLog.Count;
+        LogText = string.Join("\n", DiagnosticLog.Latest(VisibleLogLines).Select(entry => entry.ToLine()));
+    }
+
+    /// <summary>写到缓存目录再走系统分享面板，AirDrop / 微信 / 文件 App 都能接；结果也记进日志本身。</summary>
+    private async Task ExportLogAsync(bool json)
+    {
+        try
+        {
+            string name = $"runner-log-{DateTime.Now:yyyyMMdd-HHmmss}.{(json ? "json" : "txt")}";
+            string path = Path.Combine(FileSystem.CacheDirectory, name);
+            string content = json
+                ? DiagnosticLog.ToJson()
+                : $"# Runner {AppInfo.Current.VersionString} · {DeviceInfo.Current.Platform} {DeviceInfo.Current.VersionString} · {DeviceInfo.Current.Model}\n{DiagnosticLog.ToText()}";
+            await File.WriteAllTextAsync(path, content);
+            await Share.Default.RequestAsync(new ShareFileRequest { Title = name, File = new ShareFile(path) });
+            DiagnosticLog.Write("诊断", $"已导出 {name}");
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLog.Write("诊断", $"导出失败: {ex.Message}");
+        }
     }
 
     #endregion

@@ -1,3 +1,4 @@
+using Runner.Business.Diagnostics;
 using Runner.Business.Location;
 using Runner.Business.Media;
 using Runner.Business.StepCounter;
@@ -80,6 +81,7 @@ public sealed class RunSessionController : IDisposable
             session.Start(targetCadence, cadenceAvailable: _steps != null);
             _session = session;
         }
+        DiagnosticLog.Write("会话", $"开始 课程={plan?.Name ?? "自由跑"} 目标步频={targetCadence} GPS={HasGps} 计步={HasCadenceSource}");
         _gps?.Reset();
         _steps?.Reset();
         if (!_platform.CanControlMusic && plan?.Stages.Any(stage => stage.SwitchTrackOnEnter) == true)
@@ -98,6 +100,7 @@ public sealed class RunSessionController : IDisposable
         {
             RequireSession().Pause();
         }
+        DiagnosticLog.Write("会话", "暂停");
         StopSources();
         StopTicker();
         Updated?.Invoke();
@@ -112,6 +115,7 @@ public sealed class RunSessionController : IDisposable
             session.Resume();
             targetCadence = session.TargetCadence;
         }
+        DiagnosticLog.Write("会话", "继续");
         // 暂停期间可能重新开启了定位；Android 需同步升级前台服务的实际类型。
         Try(() => _platform.StartBackgroundSession(HasGps), "后台运动服务恢复");
         await StartSourcesAsync(targetCadence);
@@ -127,6 +131,7 @@ public sealed class RunSessionController : IDisposable
             session = RequireSession();
             session.Stop();
         }
+        DiagnosticLog.Write("会话", $"结束 时长={session.Elapsed.TotalSeconds:F0}s 距离={session.DistanceMeters:F0}m 步数={session.StepCount}");
         StopSources();
         StopTicker();
         Try(_platform.StopBackgroundSession, "后台运动服务停止");
@@ -141,7 +146,11 @@ public sealed class RunSessionController : IDisposable
         if (_gps != null)
         {
             try { await _gps.StartAsync(); }
-            catch (Exception ex) { Error?.Invoke($"GPS 启动失败: {ex.Message}"); }
+            catch (Exception ex)
+            {
+                DiagnosticLog.Write("会话", $"GPS 启动失败: {ex.Message}");
+                Error?.Invoke($"GPS 启动失败: {ex.Message}");
+            }
         }
         if (_steps != null)
             Try(_steps.Start, "计步启动");
@@ -186,11 +195,13 @@ public sealed class RunSessionController : IDisposable
 
         if (entered != null)
         {
+            DiagnosticLog.Write("会话", $"进入阶段 步频={entered.TargetCadence} 切歌={entered.SwitchTrackOnEnter}");
             ApplyCadence(entered.TargetCadence);
             if (entered.SwitchTrackOnEnter && _platform.CanControlMusic) Try(NextTrack, "切歌");
         }
         else if (completed)
         {
+            DiagnosticLog.Write("会话", "课程完成");
             _metronome.Stop();
         }
         Updated?.Invoke();
@@ -198,7 +209,11 @@ public sealed class RunSessionController : IDisposable
 
     private void NextTrack() => _platform.NextTrack();
 
-    private void OnSourceError(string message) => Error?.Invoke(message);
+    private void OnSourceError(string message)
+    {
+        DiagnosticLog.Write("来源", message);
+        Error?.Invoke(message);
+    }
 
     private void StartTicker()
     {
@@ -228,7 +243,11 @@ public sealed class RunSessionController : IDisposable
     private void Try(Action action, string description)
     {
         try { action(); }
-        catch (Exception ex) { Error?.Invoke($"{description}失败: {ex.Message}"); }
+        catch (Exception ex)
+        {
+            DiagnosticLog.Write("会话", $"{description}失败: {ex.Message}");
+            Error?.Invoke($"{description}失败: {ex.Message}");
+        }
     }
 
     private void OnDistance(double totalMeters)

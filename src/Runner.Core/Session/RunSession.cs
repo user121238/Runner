@@ -13,6 +13,7 @@ public sealed class RunSession
     private readonly object _lock = new();
     private readonly List<GeoCoordinate> _trackPoints = new();
     private readonly List<CadenceSample> _cadenceSamples = new();
+    private readonly List<DistanceSample> _distanceSamples = new();
     private TimeSpan _accumulated;
     private DateTimeOffset _segmentStart;
 
@@ -42,14 +43,12 @@ public sealed class RunSession
     {
         get
         {
-            lock (_lock)
-            {
-                return State == RunSessionState.Running
-                    ? _accumulated + (_clock.GetUtcNow() - _segmentStart)
-                    : _accumulated;
-            }
+            lock (_lock) return ElapsedUnlocked;
         }
     }
+
+    private TimeSpan ElapsedUnlocked =>
+        State == RunSessionState.Running ? _accumulated + (_clock.GetUtcNow() - _segmentStart) : _accumulated;
 
     /// <summary>平均步频 = 步数 / 跑动分钟数。</summary>
     public double AverageCadence
@@ -74,6 +73,16 @@ public sealed class RunSession
     // 真正的快照：调用方枚举时不受传感器回调修改影响。
     public IReadOnlyList<GeoCoordinate> TrackPoints { get { lock (_lock) return _trackPoints.ToArray(); } }
     public IReadOnlyList<CadenceSample> CadenceSamples { get { lock (_lock) return _cadenceSamples.ToArray(); } }
+    public IReadOnlyList<DistanceSample> DistanceSamples { get { lock (_lock) return _distanceSamples.ToArray(); } }
+
+    /// <summary>实时配速：最近 30 秒的 Δt/Δd；站着、GPS 断流或距离太短为 null。锁内只读，不复制采样。</summary>
+    public TimeSpan? CurrentPace
+    {
+        get
+        {
+            lock (_lock) return PaceCalculator.Current(_distanceSamples, ElapsedUnlocked);
+        }
+    }
 
     public void Start(int targetCadence, bool cadenceAvailable = true)
     {
@@ -133,7 +142,7 @@ public sealed class RunSession
         }
     }
 
-    /// <summary>外部追踪器的累计距离（米）。非 Running 时忽略。</summary>
+    /// <summary>外部追踪器的累计距离（米），同时记录一条（跑动时长, 距离）采样供配速推算。非 Running 时忽略。</summary>
     public void UpdateDistance(double totalMeters)
     {
         if (!double.IsFinite(totalMeters) || totalMeters < 0)
@@ -142,6 +151,7 @@ public sealed class RunSession
         {
             if (State != RunSessionState.Running) return;
             DistanceMeters = totalMeters;
+            _distanceSamples.Add(new DistanceSample(ElapsedUnlocked, totalMeters));
         }
     }
 

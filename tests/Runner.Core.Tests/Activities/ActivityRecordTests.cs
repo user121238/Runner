@@ -39,6 +39,10 @@ public sealed class ActivityRecordTests
         Assert.HasCount(1, record.CadencePoints);
         Assert.AreEqual(170, record.CadencePoints[0].StepsPerMinute);
         Assert.AreEqual(ManualTimeProvider.Epoch.AddSeconds(10).UtcDateTime, record.CadencePoints[0].TimeUtc);
+        Assert.HasCount(1, record.DistanceSamples);
+        Assert.AreEqual(300, record.DistanceSamples[0].ElapsedSeconds);
+        Assert.AreEqual(1000, record.DistanceSamples[0].Meters);
+        Assert.AreEqual(new DistanceSample(TimeSpan.FromSeconds(300), 1000), record.DistanceSamples[0].ToSample());
     }
 
     [TestMethod]

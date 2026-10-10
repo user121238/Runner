@@ -3,6 +3,7 @@ using Prism.Navigation;
 using Runner.Business.Services.Activities;
 using Runner.Client.Drawables;
 using Runner.Core.Activities;
+using Runner.Core.Session;
 
 namespace Runner.Client.ViewModels;
 
@@ -14,11 +15,12 @@ public class ActivityDetailPageViewModel : BindableBase, INavigatedAware
     private string _workoutName = "";
     private string _distance = "0.00";
     private string _duration = "0:00";
-    private string _averageSpeed = "0.0";
+    private string _averagePace = "—";
+    private string _fastestPace = "—";
+    private string _slowestPace = "—";
     private string _averageCadence = "0";
     private string _stepCount = "0";
-    private string _trackPointCount = "0";
-    private string _timeRange = "";
+    private string _footer = "";
     private string _message = "";
     private IDrawable _trajectory = new TrajectoryDrawable(Array.Empty<TrackPoint>());
 
@@ -31,11 +33,13 @@ public class ActivityDetailPageViewModel : BindableBase, INavigatedAware
     public string WorkoutName { get => _workoutName; private set => SetProperty(ref _workoutName, value); }
     public string Distance { get => _distance; private set => SetProperty(ref _distance, value); }
     public string Duration { get => _duration; private set => SetProperty(ref _duration, value); }
-    public string AverageSpeed { get => _averageSpeed; private set => SetProperty(ref _averageSpeed, value); }
+    public string AveragePace { get => _averagePace; private set => SetProperty(ref _averagePace, value); }
+    public string FastestPace { get => _fastestPace; private set => SetProperty(ref _fastestPace, value); }
+    public string SlowestPace { get => _slowestPace; private set => SetProperty(ref _slowestPace, value); }
     public string AverageCadence { get => _averageCadence; private set => SetProperty(ref _averageCadence, value); }
     public string StepCount { get => _stepCount; private set => SetProperty(ref _stepCount, value); }
-    public string TrackPointCount { get => _trackPointCount; private set => SetProperty(ref _trackPointCount, value); }
-    public string TimeRange { get => _timeRange; private set => SetProperty(ref _timeRange, value); }
+    /// <summary>起止时间 · 均速 · 轨迹点数，一行小字。</summary>
+    public string Footer { get => _footer; private set => SetProperty(ref _footer, value); }
     public string Message
     {
         get => _message;
@@ -84,11 +88,14 @@ public class ActivityDetailPageViewModel : BindableBase, INavigatedAware
         WorkoutName = string.IsNullOrEmpty(record.WorkoutName) ? "自由跑" : record.WorkoutName;
         Distance = (record.DistanceMeters / 1000).ToString("F2");
         Duration = ActivityListItem.FormatDuration(record.ElapsedSeconds);
-        AverageSpeed = record.AverageSpeedKmh.ToString("F1");
+        AveragePace = PaceFormat.Text(PaceCalculator.Average(TimeSpan.FromSeconds(record.ElapsedSeconds), record.DistanceMeters));
+        // 旧记录没有距离序列，最快 / 最慢显示 —
+        var pace = PaceCalculator.Summarize(record.DistanceSamples.Select(p => p.ToSample()).ToList());
+        FastestPace = PaceFormat.Text(pace.Fastest);
+        SlowestPace = PaceFormat.Text(pace.Slowest);
         AverageCadence = record.AverageCadence.ToString("F0");
         StepCount = record.StepCount.ToString();
-        TrackPointCount = record.TrackPoints.Count.ToString();
-        TimeRange = $"{start:yyyy-MM-dd HH:mm} – {end:HH:mm}";
+        Footer = $"{start:yyyy-MM-dd HH:mm} – {end:HH:mm} · 均速 {record.AverageSpeedKmh:F1} km/h · 轨迹点 {record.TrackPoints.Count}";
         Trajectory = new TrajectoryDrawable(record.TrackPoints);
     }
 }

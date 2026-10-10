@@ -76,6 +76,41 @@ public sealed class RunSessionTests
     }
 
     [TestMethod]
+    public void UpdateDistance_RecordsSamplesOnlyWhileRunning_AndDrivesCurrentPace()
+    {
+        var session = StartedSession();
+        Assert.IsEmpty(session.DistanceSamples);
+        Assert.IsNull(session.CurrentPace);
+
+        _clock.SetSeconds(10);
+        session.UpdateDistance(25);
+        _clock.SetSeconds(20);
+        session.UpdateDistance(50);
+        _clock.SetSeconds(30);
+        session.UpdateDistance(75);
+
+        Assert.AreEqual(TimeSpan.FromSeconds(400), session.CurrentPace);
+
+        // 暂停期间的距离被忽略，不产生采样；暂停不计入跑动时长
+        session.Pause();
+        session.UpdateDistance(500);
+        Assert.AreEqual(75, session.DistanceMeters);
+        _clock.SetSeconds(40);
+        session.Resume();
+        _clock.SetSeconds(50);
+        session.UpdateDistance(100);
+
+        var samples = session.DistanceSamples;
+        Assert.HasCount(4, samples);
+        Assert.AreEqual(new DistanceSample(TimeSpan.FromSeconds(10), 25), samples[0]);
+        Assert.AreEqual(new DistanceSample(TimeSpan.FromSeconds(40), 100), samples[3]);
+
+        // 20 秒没有新的距离采样：人站着，实时配速不显示
+        _clock.SetSeconds(70);
+        Assert.IsNull(session.CurrentPace);
+    }
+
+    [TestMethod]
     public void SetTargetCadence_UpdatesWhileActiveAndRejectsAfterStop()
     {
         var session = StartedSession();

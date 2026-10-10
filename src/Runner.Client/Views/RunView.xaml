@@ -96,18 +96,57 @@
                     <Label Style="{StaticResource Hero}" Text="{Binding Elapsed}" />
                     <Label Style="{StaticResource MetricCaption}" Text="时长" />
                 </VerticalStackLayout>
-                <Grid ColumnDefinitions="*,*,*">
+                <!--  跑动中：距离 / 实时配速，步频 / 目标步频  -->
+                <Grid ColumnDefinitions="*,*"
+                      IsVisible="{Binding IsActive}"
+                      RowDefinitions="Auto,Auto"
+                      RowSpacing="20">
                     <VerticalStackLayout Spacing="2">
                         <Label Style="{StaticResource Metric}" Text="{Binding DistanceKm, StringFormat='{}{0:F2}'}" />
                         <Label Style="{StaticResource MetricCaption}" Text="公里" />
                     </VerticalStackLayout>
                     <VerticalStackLayout Grid.Column="1" Spacing="2">
+                        <Label Style="{StaticResource Metric}" Text="{Binding PaceText}" />
+                        <Label Style="{StaticResource MetricCaption}" Text="配速" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Row="1" Spacing="2">
                         <Label Style="{StaticResource Metric}" Text="{Binding CadenceText}" />
                         <Label Style="{StaticResource MetricCaption}" Text="步频" />
                     </VerticalStackLayout>
-                    <VerticalStackLayout Grid.Column="2" Spacing="2">
+                    <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2">
                         <Label Style="{StaticResource Metric}" Text="{Binding TargetCadenceText}" TextColor="{StaticResource Accent}" />
                         <Label Style="{StaticResource MetricCaption}" Text="目标步频" />
+                    </VerticalStackLayout>
+                </Grid>
+
+                <!--  结束后：成绩  -->
+                <Grid ColumnDefinitions="*,*,*"
+                      IsVisible="{Binding IsStopped}"
+                      RowDefinitions="Auto,Auto"
+                      RowSpacing="20">
+                    <VerticalStackLayout Spacing="2">
+                        <Label FontSize="30" Style="{StaticResource Metric}" Text="{Binding DistanceKm, StringFormat='{}{0:F2}'}" />
+                        <Label Style="{StaticResource MetricCaption}" Text="公里" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="1" Spacing="2">
+                        <Label FontSize="30" Style="{StaticResource Metric}" Text="{Binding AveragePaceText}" TextColor="{StaticResource Accent}" />
+                        <Label Style="{StaticResource MetricCaption}" Text="平均配速" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="2" Spacing="2">
+                        <Label FontSize="30" Style="{StaticResource Metric}" Text="{Binding AverageCadenceText}" />
+                        <Label Style="{StaticResource MetricCaption}" Text="均步频" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Row="1" Spacing="2">
+                        <Label FontSize="30" Style="{StaticResource Metric}" Text="{Binding FastestPaceText}" />
+                        <Label Style="{StaticResource MetricCaption}" Text="最快配速" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Row="1" Grid.Column="1" Spacing="2">
+                        <Label FontSize="30" Style="{StaticResource Metric}" Text="{Binding SlowestPaceText}" />
+                        <Label Style="{StaticResource MetricCaption}" Text="最慢配速" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Row="1" Grid.Column="2" Spacing="2">
+                        <Label FontSize="30" Style="{StaticResource Metric}" Text="{Binding StepCountText}" />
+                        <Label Style="{StaticResource MetricCaption}" Text="步数" />
                     </VerticalStackLayout>
                 </Grid>
             </VerticalStackLayout>

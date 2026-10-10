@@ -19,6 +19,8 @@ public class ActivityRecord
     public string? WorkoutName { get; set; }
     public List<TrackPoint> TrackPoints { get; set; } = new();
     public List<CadencePoint> CadencePoints { get; set; } = new();
+    /// <summary>（跑动秒数, 累计米数）序列：详情页据此重算最快 / 最慢配速；旧记录没有，留空。</summary>
+    public List<DistancePoint> DistanceSamples { get; set; } = new();
 
     public static bool ShouldRecord(RunSession session) =>
         session.State == RunSessionState.Stopped && session.Elapsed >= MinimumElapsed;
@@ -39,7 +41,8 @@ public class ActivityRecord
             AverageSpeedKmh = session.AverageSpeedKmh,
             WorkoutName = workoutName,
             TrackPoints = session.TrackPoints.Select(TrackPoint.From).ToList(),
-            CadencePoints = session.CadenceSamples.Select(CadencePoint.From).ToList()
+            CadencePoints = session.CadenceSamples.Select(CadencePoint.From).ToList(),
+            DistanceSamples = session.DistanceSamples.Select(DistancePoint.From).ToList()
         };
     }
 }

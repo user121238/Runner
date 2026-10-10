@@ -34,6 +34,14 @@ public class RunViewModel : BindableBase, IRegionAware
     private double _distanceKm;
     private string _cadenceText = "0";
     private string _targetCadenceText = "—";
+    private string _paceText = "—";
+    private string _averagePaceText = "—";
+    private string _fastestPaceText = "—";
+    private string _slowestPaceText = "—";
+    private string _averageCadenceText = "0";
+    private string _stepCountText = "0";
+    private bool _isActive;
+    private bool _isStopped;
     private string _summaryTitle = FreeRunName;
     private string _summaryDetail = "";
     private string _summaryStages = "";
@@ -108,6 +116,17 @@ public class RunViewModel : BindableBase, IRegionAware
     public double DistanceKm { get => _distanceKm; private set => SetProperty(ref _distanceKm, value); }
     public string CadenceText { get => _cadenceText; private set => SetProperty(ref _cadenceText, value); }
     public string TargetCadenceText { get => _targetCadenceText; private set => SetProperty(ref _targetCadenceText, value); }
+    /// <summary>实时配速：最近 30 秒的 Δt/Δd；站着或 GPS 断流为 —。</summary>
+    public string PaceText { get => _paceText; private set => SetProperty(ref _paceText, value); }
+
+    // ---- 结束后的成绩 ----
+    public bool IsActive { get => _isActive; private set => SetProperty(ref _isActive, value); }
+    public bool IsStopped { get => _isStopped; private set => SetProperty(ref _isStopped, value); }
+    public string AveragePaceText { get => _averagePaceText; private set => SetProperty(ref _averagePaceText, value); }
+    public string FastestPaceText { get => _fastestPaceText; private set => SetProperty(ref _fastestPaceText, value); }
+    public string SlowestPaceText { get => _slowestPaceText; private set => SetProperty(ref _slowestPaceText, value); }
+    public string AverageCadenceText { get => _averageCadenceText; private set => SetProperty(ref _averageCadenceText, value); }
+    public string StepCountText { get => _stepCountText; private set => SetProperty(ref _stepCountText, value); }
 
     // ---- 空闲时的课程摘要 ----
     public string SummaryTitle { get => _summaryTitle; private set => SetProperty(ref _summaryTitle, value); }
@@ -157,7 +176,7 @@ public class RunViewModel : BindableBase, IRegionAware
             if (last != null)
             {
                 string workout = string.IsNullOrEmpty(last.WorkoutName) ? FreeRunName : last.WorkoutName;
-                LastRunMetrics = $"{last.DistanceMeters / 1000:F2} 公里 · {ActivityListItem.FormatDuration(last.ElapsedSeconds)} · {last.AverageCadence:F0} SPM";
+                LastRunMetrics = $"{last.DistanceMeters / 1000:F2} 公里 · {ActivityListItem.FormatDuration(last.ElapsedSeconds)} · 配速 {PaceFormat.Text(PaceCalculator.Average(TimeSpan.FromSeconds(last.ElapsedSeconds), last.DistanceMeters))}";
                 LastRunMeta = $"{last.StartTimeUtc.ToLocalTime():M月d日 HH:mm} · {workout}";
             }
         }
@@ -266,6 +285,8 @@ public class RunViewModel : BindableBase, IRegionAware
 
         HasSession = session != null;
         IsIdle = !active;
+        IsActive = active;
+        IsStopped = state == RunSessionState.Stopped;
         ShowIdleHeader = !active && session == null;
         ShowNoRunHint = ShowIdleHeader && !HasLastRun;
         DateTitle = DateTime.Now.ToString("M月d日 dddd", ChineseCulture);
@@ -292,6 +313,7 @@ public class RunViewModel : BindableBase, IRegionAware
             DistanceKm = 0;
             CadenceText = cadenceAvailable ? "0" : "—";
             TargetCadenceText = "—";
+            PaceText = "—";
         }
         else
         {
@@ -299,6 +321,8 @@ public class RunViewModel : BindableBase, IRegionAware
             DistanceKm = session.DistanceKm;
             CadenceText = cadenceAvailable ? session.CurrentCadence.ToString("F0") : "—";
             TargetCadenceText = active && session.TargetCadence > 0 ? session.TargetCadence.ToString() : "—";
+            PaceText = PaceFormat.Text(session.CurrentPace);
+            if (IsStopped) DescribeResult(session);
         }
 
         var workout = controller?.Workout;
@@ -316,6 +340,17 @@ public class RunViewModel : BindableBase, IRegionAware
         }
 
         StopCommand.RaiseCanExecuteChanged();
+    }
+
+    /// <summary>结束后的成绩：平均 / 最快 / 最慢配速、均步频、步数。只在 Stopped 时算，Summarize 是 O(n)。</summary>
+    private void DescribeResult(RunSession session)
+    {
+        AveragePaceText = PaceFormat.Text(PaceCalculator.Average(session.Elapsed, session.DistanceMeters));
+        var pace = PaceCalculator.Summarize(session.DistanceSamples);
+        FastestPaceText = PaceFormat.Text(pace.Fastest);
+        SlowestPaceText = PaceFormat.Text(pace.Slowest);
+        AverageCadenceText = session.AverageCadence.ToString("F0");
+        StepCountText = session.StepCount.ToString();
     }
 
     private void DescribeWorkout(WorkoutRunner workout, RunSession session)

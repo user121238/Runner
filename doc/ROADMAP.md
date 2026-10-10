@@ -99,6 +99,12 @@
 - 诊断页按调试工具对待，不重做。
 - Logo 与开屏（2026-10-10）：单线 R 标记（荧光绿 / 近黑，右腿拉成前冲弧线），`Resources/AppIcon`（自适应图标，标记最远点在半径 57%，安全区 61% 内）、`Resources/Splash`（放大 1.5 倍，Android 12+ 圆形开屏槽内不裁）、`Platforms/Android/Resources/drawable/ic_stat_runner.xml`（前台通知纯白单色版，服务通过 `RunnerService.SmallIconResourceId` 取用）；应用名 Runner；原生 `colors.xml` 与 csproj 图标 / 开屏底色对齐令牌，模板紫清零。
 
+### P8 配速 — 代码完成（2026-10-10），待真机验收
+
+- `RunSession` 记录（跑动时长, 累计距离）序列；`PaceCalculator`（Core）：实时配速 = 最近 30 秒窗，最快 / 最慢 = 100 米最紧滑窗取极值、停留超 10 秒断段、慢于 20'/km 不计，平均 = 时长 / 距离。15 个用例，规则见 `ALGORITHM_VALIDATION.md`。
+- `ActivityRecord.DistanceSamples` 随记录落盘，详情页据此重算最快 / 最慢；旧记录显示 —。
+- 界面：跑动中 2×2（距离 / 配速、步频 / 目标步频）；结束后 2×3（距离 / 平均配速 / 均步频、最快 / 最慢配速 / 步数）；记录列表与首页「上次跑步」卡用配速替代 km/h；详情页六格改为时长 / 平均 / 均步频、最快 / 最慢 / 步数，均速与轨迹点数退到页脚。
+
 ## 冻结范围：手表蓝牙
 
 以下代码保留并继续编译，不投入：`Services/Ble/*`（`WatchBleService` 系列、`WatchRfcommService`、`WatchAuthService`、`DeviceEncryptInterop`、`IWatchBleService`）、`Models/WatchBle/*`、`Services/Database/MiHealthDataReader`、`WatchWorkoutPage` / `WatchWorkoutViewModel`、`BlePermissionHelper`、`Platforms/Android/java` 与 `libs` 原生库、Manifest 中的 `BLUETOOTH_*` 权限、`MauiProgram` 中的 BLE 注册。

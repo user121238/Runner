@@ -1,8 +1,9 @@
 ﻿using Runner.Core.Activities;
+using Runner.Core.Session;
 
 namespace Runner.Client.ViewModels;
 
-/// <summary>记录列表项：距离为主数字，日期、时长 / 均步频 / 均速一行，课程名作标签。</summary>
+/// <summary>记录列表项：距离为主数字，日期、时长 / 配速 / 均步频一行，课程名作标签。</summary>
 public sealed class ActivityListItem
 {
     public ActivityListItem(ActivityRecord record)
@@ -12,7 +13,7 @@ public sealed class ActivityListItem
         Title = start.ToString("yyyy-MM-dd HH:mm");
         Date = start.ToString("M月d日 HH:mm");
         Distance = (record.DistanceMeters / 1000).ToString("F2");
-        Detail = $"{FormatDuration(record.ElapsedSeconds)} · 均步频 {record.AverageCadence:F0} · {record.AverageSpeedKmh:F1} km/h";
+        Detail = $"{FormatDuration(record.ElapsedSeconds)} · 配速 {PaceFormat.Text(PaceCalculator.Average(TimeSpan.FromSeconds(record.ElapsedSeconds), record.DistanceMeters))} · 均步频 {record.AverageCadence:F0}";
         WorkoutName = record.WorkoutName ?? "";
         Summary = string.IsNullOrEmpty(WorkoutName) ? Detail : $"{Detail} · {WorkoutName}";
     }

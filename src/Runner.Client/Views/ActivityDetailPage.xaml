@@ -33,6 +33,7 @@
                 <GraphicsView Drawable="{Binding Trajectory}" HeightRequest="280" />
             </Border>
 
+            <!--  时长 / 平均配速 / 均步频；最快 / 最慢配速 / 步数  -->
             <Grid ColumnDefinitions="*,*,*"
                   ColumnSpacing="10"
                   RowDefinitions="Auto,Auto"
@@ -45,34 +46,37 @@
                 </Border>
                 <Border Grid.Column="1" Style="{StaticResource StatCard}">
                     <VerticalStackLayout Spacing="2">
-                        <Label Style="{StaticResource StatValue}" Text="{Binding AverageSpeed}" />
-                        <Label Style="{StaticResource MetricCaption}" Text="均速 km/h" />
+                        <Label Style="{StaticResource StatValue}" Text="{Binding AveragePace}" TextColor="{StaticResource Accent}" />
+                        <Label Style="{StaticResource MetricCaption}" Text="平均配速" />
                     </VerticalStackLayout>
                 </Border>
                 <Border Grid.Column="2" Style="{StaticResource StatCard}">
                     <VerticalStackLayout Spacing="2">
-                        <Label Style="{StaticResource StatValue}" Text="{Binding AverageCadence}" TextColor="{StaticResource Accent}" />
+                        <Label Style="{StaticResource StatValue}" Text="{Binding AverageCadence}" />
                         <Label Style="{StaticResource MetricCaption}" Text="均步频" />
                     </VerticalStackLayout>
                 </Border>
                 <Border Grid.Row="1" Style="{StaticResource StatCard}">
                     <VerticalStackLayout Spacing="2">
-                        <Label Style="{StaticResource StatValue}" Text="{Binding StepCount}" />
-                        <Label Style="{StaticResource MetricCaption}" Text="步数" />
+                        <Label Style="{StaticResource StatValue}" Text="{Binding FastestPace}" />
+                        <Label Style="{StaticResource MetricCaption}" Text="最快配速" />
                     </VerticalStackLayout>
                 </Border>
                 <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource StatCard}">
                     <VerticalStackLayout Spacing="2">
-                        <Label Style="{StaticResource StatValue}" Text="{Binding TrackPointCount}" />
-                        <Label Style="{StaticResource MetricCaption}" Text="轨迹点" />
+                        <Label Style="{StaticResource StatValue}" Text="{Binding SlowestPace}" />
+                        <Label Style="{StaticResource MetricCaption}" Text="最慢配速" />
                     </VerticalStackLayout>
                 </Border>
                 <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource StatCard}">
-                    <VerticalStackLayout Spacing="2" VerticalOptions="Center">
-                        <Label Style="{StaticResource Caption}" HorizontalTextAlignment="Center" Text="{Binding TimeRange}" LineBreakMode="WordWrap" />
+                    <VerticalStackLayout Spacing="2">
+                        <Label Style="{StaticResource StatValue}" Text="{Binding StepCount}" />
+                        <Label Style="{StaticResource MetricCaption}" Text="步数" />
                     </VerticalStackLayout>
                 </Border>
             </Grid>
+
+            <Label HorizontalTextAlignment="Center" Style="{StaticResource Caption}" Text="{Binding Footer}" />
 
             <Label HorizontalTextAlignment="Center"
                    IsVisible="{Binding HasMessage}"

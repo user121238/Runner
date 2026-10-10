@@ -2,8 +2,12 @@
 using Prism.Mvvm;
 using Prism.Navigation;
 using Runner.Business.Location;
+using Runner.Business.Media;
 using Runner.Business.Session;
 using Runner.Business.StepCounter;
+#if IOS
+using Runner.Business.Platforms.iOS.Media;
+#endif
 
 namespace Runner.Client.ViewModels;
 
@@ -23,6 +27,8 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
     private double _gpsDistance;
     private double _gpsSpeed;
     private string _gpsStatus = "";
+    private string _mediaRemoteStatus = "";
+    private string _shortcutsStatus = "";
 
     public DiagnosticsPageViewModel(RunSessionHost host)
     {
@@ -31,6 +37,14 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
         NextTrackCommand = new DelegateCommand(() => RunDiagnostic(_host.NextTrack), CanUseMusic);
         PreviousTrackCommand = new DelegateCommand(() => RunDiagnostic(_host.PreviousTrack), CanUseMusic);
         PlayPauseCommand = new DelegateCommand(() => RunDiagnostic(_host.PlayPause), CanUseMusic);
+        MediaRemotePreviousCommand = new DelegateCommand(() => RunMediaRemote("上一首", MediaRemoteCommand.PreviousTrack));
+        MediaRemoteNextCommand = new DelegateCommand(() => RunMediaRemote("下一首", MediaRemoteCommand.NextTrack));
+        MediaRemotePauseCommand = new DelegateCommand(() => RunMediaRemote("暂停", MediaRemoteCommand.Pause));
+        MediaRemotePlayCommand = new DelegateCommand(() => RunMediaRemote("播放", MediaRemoteCommand.Play));
+        ShortcutsPreviousCommand = new AsyncDelegateCommand(() => RunShortcutAsync("上一首"));
+        ShortcutsNextCommand = new AsyncDelegateCommand(() => RunShortcutAsync("下一首"));
+        ShortcutsPauseCommand = new AsyncDelegateCommand(() => RunShortcutAsync("暂停"));
+        ShortcutsPlayCommand = new AsyncDelegateCommand(() => RunShortcutAsync("播放"));
         StartTickCommand = new DelegateCommand(() => RunDiagnostic(() => _host.Metronome.Start(MetronomeCadence)), CanModify);
         StopTickCommand = new DelegateCommand(() => RunDiagnostic(_host.Metronome.Stop), CanModify);
         StartPedometerCommand = new DelegateCommand(() => RunDiagnostic(StartPedometer), CanModify);
@@ -48,6 +62,14 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
     public DelegateCommand NextTrackCommand { get; }
     public DelegateCommand PreviousTrackCommand { get; }
     public DelegateCommand PlayPauseCommand { get; }
+    public DelegateCommand MediaRemotePreviousCommand { get; }
+    public DelegateCommand MediaRemoteNextCommand { get; }
+    public DelegateCommand MediaRemotePauseCommand { get; }
+    public DelegateCommand MediaRemotePlayCommand { get; }
+    public AsyncDelegateCommand ShortcutsPreviousCommand { get; }
+    public AsyncDelegateCommand ShortcutsNextCommand { get; }
+    public AsyncDelegateCommand ShortcutsPauseCommand { get; }
+    public AsyncDelegateCommand ShortcutsPlayCommand { get; }
     public DelegateCommand StartTickCommand { get; }
     public DelegateCommand StopTickCommand { get; }
     public DelegateCommand StartPedometerCommand { get; }
@@ -68,6 +90,13 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
     public bool CanControlMusic => _host.CanControlMusic;
     public bool CanSwitchStepCounter => _host.CanSwitchStepCounter;
     public string MusicControlStatus => _host.MusicControlStatus;
+    public string MediaRemoteStatus { get => _mediaRemoteStatus; private set => SetProperty(ref _mediaRemoteStatus, value); }
+    public string ShortcutsStatus { get => _shortcutsStatus; private set => SetProperty(ref _shortcutsStatus, value); }
+#if IOS
+    public bool CanTestIosMedia => true;
+#else
+    public bool CanTestIosMedia => false;
+#endif
     public string DiagnosticNotice => _host.IsSessionActive
         ? "运动进行中：诊断页仅查看数据，结束运动后再操作来源。"
         : "手动操作只用于排障，开始运动后由会话统一管理来源。";
@@ -122,6 +151,11 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
         }
         BindSources();
         RefreshAvailability();
+#if IOS
+        MediaRemoteStatus = MediaRemoteController.TryLoad()
+            ? "MediaRemote 已加载，可直接测试"
+            : $"MediaRemote 加载失败: {MediaRemoteController.LoadError}";
+#endif
     }
 
     private void BindSources()
@@ -282,6 +316,53 @@ public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestruct
         GpsDistance = 0;
         GpsSpeed = 0;
     }
+
+    #endregion
+
+    #region iOS 媒体控制测试
+
+    private void RunMediaRemote(string action, MediaRemoteCommand command)
+    {
+#if IOS
+        try
+        {
+            MediaRemoteController.Send(command);
+            MediaRemoteStatus = $"{action}: 命令已发送，听声音确认";
+        }
+        catch (Exception ex)
+        {
+            MediaRemoteStatus = $"{action}: 失败 - {ex.Message}";
+        }
+#else
+        MediaRemoteStatus = "仅 iOS 支持";
+#endif
+    }
+
+    private Task RunShortcutAsync(string name)
+    {
+#if IOS
+        return RunShortcutCoreAsync(name);
+#else
+        ShortcutsStatus = "仅 iOS 支持";
+        return Task.CompletedTask;
+#endif
+    }
+
+#if IOS
+    private async Task RunShortcutCoreAsync(string name)
+    {
+        try
+        {
+            ShortcutsStatus = await ShortcutsController.RunAsync(name)
+                ? $"已请求运行「{name}」"
+                : $"无法打开「{name}」，请先在快捷指令 App 创建";
+        }
+        catch (Exception ex)
+        {
+            ShortcutsStatus = $"运行「{name}」失败: {ex.Message}";
+        }
+    }
+#endif
 
     #endregion
 }

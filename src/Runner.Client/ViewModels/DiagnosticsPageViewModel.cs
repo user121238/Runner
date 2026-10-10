@@ -8,8 +8,8 @@ using Runner.Business.Platforms.Android.StepCounter;
 
 namespace Runner.Client.ViewModels;
 
-/// <summary>诊断页：逐个来源单独起停，真机排障用。来源实例来自 RunSessionHost，不自建。</summary>
-public class DiagnosticsPageViewModel : BindableBase, IDestructible
+/// <summary>诊断页：逐个来源单独起停，真机排障用。来源实例来自 RunSessionHost，不自建；进入时初始化 host（申请权限、创建来源）。</summary>
+public class DiagnosticsPageViewModel : BindableBase, INavigatedAware, IDestructible
 {
     private const int MetronomeCadence = 180;
     private readonly RunSessionHost _host;
@@ -41,8 +41,6 @@ public class DiagnosticsPageViewModel : BindableBase, IDestructible
         StartGpsTrackingCommand = new AsyncDelegateCommand(StartGpsTrackingAsync);
         StopGpsTrackingCommand = new DelegateCommand(StopGpsTracking);
         ResetGpsDistanceCommand = new DelegateCommand(ResetGpsDistance);
-
-        BindSources();
     }
 
     public DelegateCommand NextTrackCommand { get; }
@@ -65,6 +63,23 @@ public class DiagnosticsPageViewModel : BindableBase, IDestructible
     public double GpsDistance { get => _gpsDistance; private set => SetProperty(ref _gpsDistance, value); }
     public double GpsSpeed { get => _gpsSpeed; private set => SetProperty(ref _gpsSpeed, value); }
     public string GpsStatus { get => _gpsStatus; private set => SetProperty(ref _gpsStatus, value); }
+
+    public void OnNavigatedTo(INavigationParameters parameters) => _ = InitializeAsync();
+
+    public void OnNavigatedFrom(INavigationParameters parameters) { }
+
+    private async Task InitializeAsync()
+    {
+        try
+        {
+            await _host.InitializeAsync();
+        }
+        catch (Exception ex)
+        {
+            GpsStatus = $"初始化失败: {ex.Message}";
+        }
+        BindSources();
+    }
 
     private void BindSources()
     {

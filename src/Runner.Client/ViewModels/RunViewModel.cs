@@ -11,6 +11,7 @@ namespace Runner.Client.ViewModels;
 /// <summary>
 /// 首页：时长 / 距离 / 实际步频 / 目标步频，一个主按钮随状态变为 开始 / 暂停 / 继续；
 /// 空闲时选课程（或自由跑），进行中显示课程的轮次、阶段与剩余量。
+/// 权限与传感器来源在首次点击开始时才申请、创建，页面本身不依赖它们。
 /// </summary>
 public class RunViewModel : BindableBase, IRegionAware
 {
@@ -19,7 +20,7 @@ public class RunViewModel : BindableBase, IRegionAware
     private IReadOnlyList<WorkoutPlan> _plans = Array.Empty<WorkoutPlan>();
     private bool _loadingChoices;
 
-    private string _statusText = "正在申请权限…";
+    private string _statusText = "";
     private string _elapsed = "00:00:00";
     private double _distanceKm;
     private string _cadenceText = "0";
@@ -35,12 +36,13 @@ public class RunViewModel : BindableBase, IRegionAware
     public RunViewModel(RunSessionHost host)
     {
         _host = host;
-        PrimaryCommand = new AsyncDelegateCommand(PrimaryAsync, () => CanPrimary);
+        PrimaryCommand = new AsyncDelegateCommand(PrimaryAsync);
         StopCommand = new DelegateCommand(Stop, () => CanStop);
         _host.Updated += OnHostUpdated;
         _host.Error += OnHostMessage;
         _host.Notice += OnHostMessage;
         _host.Workouts.Changed += OnWorkoutsChanged;
+        _ = LoadWorkoutChoicesAsync();
     }
 
     public AsyncDelegateCommand PrimaryCommand { get; }
@@ -73,26 +75,11 @@ public class RunViewModel : BindableBase, IRegionAware
         }
     }
 
-    public bool CanPrimary => _host.Controller != null;
-
     public bool IsNavigationTarget(NavigationContext navigationContext) => true;
 
     public void OnNavigatedFrom(NavigationContext navigationContext) { }
 
-    public void OnNavigatedTo(NavigationContext navigationContext) => _ = InitializeAsync();
-
-    private async Task InitializeAsync()
-    {
-        try
-        {
-            await _host.InitializeAsync();
-        }
-        catch (Exception ex)
-        {
-            Message = $"初始化失败: {ex.Message}";
-        }
-        await LoadWorkoutChoicesAsync();
-    }
+    public void OnNavigatedTo(NavigationContext navigationContext) => Refresh();
 
     private void OnWorkoutsChanged() => MainThread.BeginInvokeOnMainThread(() => _ = LoadWorkoutChoicesAsync());
 
@@ -127,12 +114,12 @@ public class RunViewModel : BindableBase, IRegionAware
 
     private async Task PrimaryAsync()
     {
-        var controller = _host.Controller;
-        if (controller == null) return;
-
         Message = "";
         try
         {
+            // 权限与来源在首次点击开始时申请、创建：它们是运动的前提，不是页面的前提
+            await _host.InitializeAsync();
+            var controller = _host.Controller ?? throw new InvalidOperationException("来源未初始化");
             switch (controller.Session?.State)
             {
                 case RunSessionState.Running:
@@ -180,7 +167,7 @@ public class RunViewModel : BindableBase, IRegionAware
 
         if (session == null)
         {
-            StatusText = controller == null ? "正在申请权限…"
+            StatusText = controller == null ? ""
                 : controller.HasGps ? "准备就绪" : _host.LocationStatus;
             Elapsed = "00:00:00";
             DistanceKm = 0;
